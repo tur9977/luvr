@@ -1,147 +1,270 @@
 "use client"
 
-import { Auth } from '@supabase/auth-ui-react'
-import { ThemeSupa } from '@supabase/auth-ui-shared'
-import { supabase } from '@/lib/supabase'
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { EyeIcon, EyeOffIcon, Loader2 } from "lucide-react"
+import { supabase } from "@/lib/supabase/client"
+import { toast } from "sonner"
 
 export default function AuthPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
+  const [loginData, setLoginData] = useState({
+    email: "",
+    password: "",
+  })
+  const [registerData, setRegisterData] = useState({
+    email: "",
+    password: "",
+    username: "",
+  })
 
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') {
-        router.push('/')
+  // 處理登入
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginData.email,
+        password: loginData.password,
+      })
+
+      if (error) {
+        if (error.message.includes("Email not confirmed")) {
+          toast.error("請先驗證您的電子郵件地址", {
+            action: {
+              label: "重新發送驗證信",
+              onClick: () => handleResendVerification(loginData.email),
+            },
+          })
+          return
+        }
+        throw error
       }
-    })
 
-    return () => {
-      subscription.unsubscribe()
+      toast.success("登入成功！")
+      router.push("/")
+      router.refresh()
+    } catch (error) {
+      console.error("Login error:", error)
+      toast.error("登入失敗：" + (error as Error).message)
+    } finally {
+      setIsLoading(false)
     }
-  }, [router])
+  }
+
+  // 處理重新發送驗證郵件
+  const handleResendVerification = async (email: string) => {
+    setResendLoading(true)
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
+      
+      if (error) throw error
+      
+      toast.success("驗證郵件已重新發送，請檢查您的信箱")
+    } catch (error) {
+      console.error("Resend error:", error)
+      toast.error("發送失敗：" + (error as Error).message)
+    } finally {
+      setResendLoading(false)
+    }
+  }
+
+  // 處理註冊
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: registerData.email,
+        password: registerData.password,
+        options: {
+          data: {
+            username: registerData.username,
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
+
+      if (error) throw error
+
+      if (data?.user?.identities?.length === 0) {
+        toast.error("此電子郵件已經註冊過了，請直接登入或使用其他電子郵件。")
+        return
+      }
+
+      toast.success(
+        "註冊成功！請檢查您的信箱以驗證帳號。如果沒有收到驗證信，請檢查垃圾郵件資料夾。",
+        { 
+          duration: 6000,
+          action: {
+            label: "重新發送驗證信",
+            onClick: () => handleResendVerification(registerData.email),
+          },
+        }
+      )
+      router.push("/auth?tab=login")
+    } catch (error) {
+      console.error("Register error:", error)
+      if ((error as Error).message.includes("unique constraint")) {
+        toast.error("此電子郵件已經註冊過了，請直接登入或使用其他電子郵件。")
+      } else {
+        toast.error("註冊失敗：" + (error as Error).message)
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
-    <div className="container max-w-lg mx-auto p-4">
-      <Card className="border-none shadow-none">
-        <CardHeader className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">登入 / 註冊</h1>
-          <p className="text-sm text-muted-foreground">
-            請輸入您的電子郵件以登入或註冊
-          </p>
-        </CardHeader>
-        <CardContent>
-          <Auth
-            supabaseClient={supabase}
-            appearance={{
-              theme: ThemeSupa,
-              variables: {
-                default: {
-                  colors: {
-                    brand: 'black',
-                    brandAccent: '#333',
-                    brandButtonText: 'white',
-                    defaultButtonBackground: '#EEE',
-                    defaultButtonBackgroundHover: '#DDD',
-                    inputBackground: 'white',
-                    inputBorder: '#DDD',
-                    inputBorderFocus: 'black',
-                    inputText: 'black',
-                  },
-                },
-              },
-              style: {
-                container: {
-                  maxWidth: '100%',
-                },
-                button: {
-                  border: '1px solid black',
-                  borderRadius: '0.5rem',
-                  padding: '8px 16px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  height: '40px',
-                  backgroundColor: 'black',
-                  color: 'white',
-                  '&:hover': {
-                    backgroundColor: '#333',
-                  },
-                },
-                input: {
-                  borderRadius: '0.5rem',
-                  padding: '8px 12px',
-                  fontSize: '14px',
-                  height: '40px',
-                  backgroundColor: 'white',
-                  borderColor: '#DDD',
-                  '&:focus': {
-                    borderColor: 'black',
-                  },
-                },
-                label: {
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: 'black',
-                  marginBottom: '8px',
-                },
-                anchor: {
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: 'black',
-                  '&:hover': {
-                    color: '#333',
-                  },
-                },
-                message: {
-                  fontSize: '14px',
-                  padding: '8px',
-                  marginBottom: '16px',
-                  borderRadius: '0.5rem',
-                  backgroundColor: '#F5F5F5',
-                  color: 'black',
-                },
-                divider: {
-                  backgroundColor: '#DDD',
-                  margin: '24px 0',
-                },
-              },
-            }}
-            providers={['google', 'github']}
-            localization={{
-              variables: {
-                sign_in: {
-                  email_label: '電子郵件',
-                  password_label: '密碼',
-                  button_label: '登入',
-                  loading_button_label: '登入中...',
-                  social_provider_text: '使用 {{provider}} 登入',
-                  link_text: '已經有帳號？登入',
-                },
-                sign_up: {
-                  email_label: '電子郵件',
-                  password_label: '密碼',
-                  button_label: '註冊',
-                  loading_button_label: '註冊中...',
-                  social_provider_text: '使用 {{provider}} 註冊',
-                  link_text: '還沒有帳號？註冊',
-                  confirmation_text: '確認郵件已發送，請檢查您的收件匣',
-                },
-                forgotten_password: {
-                  email_label: '電子郵件',
-                  password_label: '密碼',
-                  button_label: '重設密碼',
-                  loading_button_label: '發送中...',
-                  link_text: '忘記密碼？',
-                  confirmation_text: '重設密碼郵件已發送',
-                },
-              },
-            }}
-            redirectTo={`${window.location.origin}/auth/callback`}
-          />
-        </CardContent>
-      </Card>
-    </div>
+    <main className="container max-w-md mx-auto p-4 pt-8">
+      <Tabs defaultValue={searchParams.get("tab") || "login"} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="login">登入</TabsTrigger>
+          <TabsTrigger value="register">註冊</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="login">
+          <Card>
+            <CardHeader>
+              <CardTitle>歡迎回來</CardTitle>
+              <CardDescription>登入您的帳號以繼續使用所有功能</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">電子郵件</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={loginData.email}
+                    onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">密碼</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={loginData.password}
+                      onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+                <Button type="submit" variant="purple" className="w-full" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      登入中...
+                    </>
+                  ) : (
+                    "登入"
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="register">
+          <Card>
+            <CardHeader>
+              <CardTitle>創建帳號</CardTitle>
+              <CardDescription>加入我們的社群，認識新朋友</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="username">用戶名稱</Label>
+                  <Input
+                    id="username"
+                    placeholder="您想要的顯示名稱"
+                    value={registerData.username}
+                    onChange={(e) => setRegisterData({ ...registerData, username: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="register-email">電子郵件</Label>
+                  <Input
+                    id="register-email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={registerData.email}
+                    onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="register-password">密碼</Label>
+                  <div className="relative">
+                    <Input
+                      id="register-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={registerData.password}
+                      onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
+                      required
+                      minLength={6}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">密碼至少需要 6 個字元</p>
+                </div>
+                <Button type="submit" variant="purple" className="w-full" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      註冊中...
+                    </>
+                  ) : (
+                    "註冊"
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </main>
   )
 }
 
