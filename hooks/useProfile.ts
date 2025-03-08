@@ -71,29 +71,47 @@ export function useProfile() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("未登入")
 
-      // 生成唯一的文件名
-      const fileExt = file.name.split(".").pop()
-      const fileName = `${user.id}-${Math.random()}.${fileExt}`
-      const filePath = `avatars/${fileName}`
+      // 生成安全的文件名
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const fileName = `${user.id}_${Date.now()}.${fileExt}`
 
       // 上傳文件
       const { error: uploadError } = await supabase.storage
-        .from("public")
-        .upload(filePath, file)
+        .from('avatars')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: file.type
+        })
 
-      if (uploadError) throw uploadError
+      if (uploadError) {
+        console.error("頭像上傳失敗:", {
+          error: uploadError,
+          message: uploadError.message
+        })
+        throw uploadError
+      }
 
-      // 獲取公開URL
+      // 獲取公開URL並確保它是完整的URL
       const { data: { publicUrl } } = supabase.storage
-        .from("public")
-        .getPublicUrl(filePath)
+        .from('avatars')
+        .getPublicUrl(fileName)
+
+      if (!publicUrl) {
+        throw new Error("無法獲取頭像公開訪問地址")
+      }
+
+      // 確保URL是完整的
+      const fullUrl = new URL(publicUrl).toString()
+      console.log("獲取到公開URL:", fullUrl)
 
       // 更新個人資料
-      await updateProfile({ avatar_url: publicUrl })
+      await updateProfile({ avatar_url: fullUrl })
       toast.success("頭像已更新")
     } catch (error) {
       console.error("Error uploading avatar:", error)
       toast.error("上傳頭像失敗")
+      throw error
     } finally {
       setUpdating(false)
     }

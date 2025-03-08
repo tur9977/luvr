@@ -10,31 +10,59 @@ import { cookies } from "next/headers"
 import { formatDistanceToNow } from "date-fns"
 import { zhTW } from "date-fns/locale"
 import type { Database } from "@/lib/types/database.types"
+import { PostActions } from "@/components/PostActions"
 
 export const revalidate = 0
 
 type Post = Database['public']['Tables']['posts']['Row']
-type User = Database['public']['Tables']['users']['Row']
-
-interface PostWithUser extends Post {
-  users: User
-  user: {
+type Profile = Database['public']['Tables']['profiles']['Row']
+type Comment = Database['public']['Tables']['comments']['Row'] & {
+  profiles: {
     id: string
     username: string
-    avatar_url: string
+    avatar_url: string | null
   }
 }
 
-async function getPosts(): Promise<PostWithUser[]> {
+interface PostWithProfile extends Post {
+  profiles: Profile
+  _count?: {
+    likes: number
+    comments: number
+    shares: number
+  }
+  has_liked?: boolean
+  comments?: Comment[]
+}
+
+async function getPosts(): Promise<PostWithProfile[]> {
   try {
     const supabase = createServerComponentClient<Database>({ cookies })
     
     console.log('開始獲取貼文...')
     
-    // 首先獲取所有貼文
     const { data: posts, error: postsError } = await supabase
       .from('posts')
-      .select('*')
+      .select(`
+        *,
+        profiles!fk_posts_profiles (
+          id,
+          username,
+          avatar_url
+        ),
+        likes(count),
+        comments(
+          id,
+          content,
+          created_at,
+          profiles(
+            id,
+            username,
+            avatar_url
+          )
+        ),
+        shares(count)
+      `)
       .order('created_at', { ascending: false })
 
     if (postsError) {
@@ -47,36 +75,38 @@ async function getPosts(): Promise<PostWithUser[]> {
       return []
     }
 
-    console.log('成功獲取貼文:', posts)
+    // 獲取當前用戶是否對每個貼文按讚
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (user && !userError) {
+      const { data: userLikes } = await supabase
+        .from('likes')
+        .select('post_id')
+        .eq('user_id', user.id)
 
-    // 然後獲取所有用戶
-    const { data: users, error: usersError } = await supabase
-      .from('users')
-      .select('*')
-
-    if (usersError) {
-      console.error('獲取用戶時出錯:', usersError.message)
-      return []
+      const likedPostIds = new Set(userLikes?.map(like => like.post_id))
+      
+      posts.forEach(post => {
+        post.has_liked = likedPostIds.has(post.id)
+        post._count = {
+          likes: post.likes?.[0]?.count || 0,
+          comments: post.comments?.length || 0,
+          shares: post.shares?.[0]?.count || 0
+        }
+      })
+    } else {
+      // 如果用戶未登入，設置默認值
+      posts.forEach(post => {
+        post.has_liked = false
+        post._count = {
+          likes: post.likes?.[0]?.count || 0,
+          comments: post.comments?.length || 0,
+          shares: post.shares?.[0]?.count || 0
+        }
+      })
     }
 
-    console.log('成功獲取用戶:', users)
-
-    // 手動關聯貼文和用戶數據
-    const formattedPosts = posts.map(post => {
-      const postUser = users?.find(user => user.id === post.user_id)
-      return {
-        ...post,
-        users: postUser || null,
-        user: {
-          id: post.user_id,
-          username: postUser?.username || '未知用戶',
-          avatar_url: postUser?.avatar_url || '/placeholder.svg'
-        }
-      }
-    }) as PostWithUser[]
-
-    console.log('格式化後的貼文:', formattedPosts)
-    return formattedPosts
+    console.log('成功獲取貼文:', posts)
+    return posts as PostWithProfile[]
   } catch (error) {
     console.error('獲取貼文時發生異常:', error)
     return []
@@ -104,9 +134,9 @@ export default async function Home() {
               <Card key={post.id}>
                 <CardHeader className="flex flex-row items-center gap-4 p-4">
                   <Avatar>
-                    <AvatarImage src={post.user.avatar_url} />
+                    <AvatarImage src={post.profiles?.avatar_url || '/placeholder.svg'} />
                     <AvatarFallback>
-                      {post.user.username.charAt(0).toUpperCase()}
+                      {(post.profiles?.username || 'U').charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col">
@@ -114,7 +144,7 @@ export default async function Home() {
                       href={`/profile/${post.user_id}`} 
                       className="text-sm font-semibold hover:underline"
                     >
-                      {post.user.username}
+                      {post.profiles?.username || '未知用戶'}
                     </Link>
                     <p className="text-xs text-muted-foreground">
                       {formatDistanceToNow(new Date(post.created_at), {
@@ -139,11 +169,10 @@ export default async function Home() {
                     <div className="relative aspect-square">
                       <Image
                         src={post.media_url}
-                        alt="Post image"
+                        alt={post.caption || "Post image"}
                         fill
                         className="object-cover"
-                        priority={false}
-                        loading="lazy"
+                        priority={posts.indexOf(post) === 0}
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       />
                     </div>
@@ -155,17 +184,14 @@ export default async function Home() {
                   )}
                 </CardContent>
                 <CardFooter className="flex justify-between p-2">
-                  <div className="flex gap-4">
-                    <Button variant="ghost" size="icon">
-                      <Heart className="h-5 w-5" />
-                    </Button>
-                    <Button variant="ghost" size="icon">
-                      <MessageCircle className="h-5 w-5" />
-                    </Button>
-                    <Button variant="ghost" size="icon">
-                      <Share2 className="h-5 w-5" />
-                    </Button>
-                  </div>
+                  <PostActions
+                    postId={post.id}
+                    initialLikesCount={post._count?.likes || 0}
+                    initialCommentsCount={post._count?.comments || 0}
+                    initialSharesCount={post._count?.shares || 0}
+                    isLiked={post.has_liked || false}
+                    initialComments={post.comments || []}
+                  />
                 </CardFooter>
               </Card>
             ))

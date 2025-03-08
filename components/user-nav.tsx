@@ -1,77 +1,84 @@
 "use client"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useProfile } from "@/hooks/useProfile"
-import { LogOut, Settings, User } from "lucide-react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase/client"
-import { toast } from "sonner"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { ProfileSettingsDialog } from "./profile-settings-dialog"
+import { LogOut } from "lucide-react"
 
 export function UserNav() {
   const { profile } = useProfile()
   const router = useRouter()
 
-  const handleLogout = async () => {
+  if (!profile) return null
+
+  const handleSignOut = async () => {
     try {
-      await supabase.auth.signOut()
-      
-      // 強制重新載入頁面以確保所有狀態都被重置
-      window.location.href = "/"
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+      router.refresh()
+      router.push("/auth")
     } catch (error) {
-      console.error("Logout error:", error)
-      toast.error("登出失敗")
+      console.error("登出失敗:", error)
     }
   }
-
-  if (!profile) return null
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={profile.avatar_url || "/placeholder.svg"} alt={profile.full_name || "用戶頭像"} />
-            <AvatarFallback>{profile.full_name?.[0] || profile.username?.[0] || "U"}</AvatarFallback>
-          </Avatar>
-        </Button>
+        <Avatar className="h-8 w-8 cursor-pointer">
+          <AvatarImage src={profile.avatar_url || "/placeholder.svg"} />
+          <AvatarFallback>
+            {(profile.username || "U").charAt(0).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="end" forceMount>
-        <DropdownMenuLabel className="font-normal">
+      <DropdownMenuContent align="end">
+        <div className="flex items-center justify-start gap-2 p-2">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{profile.full_name || profile.username || "未設定名稱"}</p>
-            <p className="text-xs leading-none text-muted-foreground">{profile.location || "未設定地點"}</p>
+            <p className="text-sm font-medium leading-none">
+              {profile.username || "未設置用戶名"}
+            </p>
+            {profile.full_name && (
+              <p className="text-xs leading-none text-muted-foreground">
+                {profile.full_name}
+              </p>
+            )}
           </div>
-        </DropdownMenuLabel>
+        </div>
         <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuItem asChild>
-            <Link href="/profile" className="w-full cursor-pointer">
-              <User className="mr-2 h-4 w-4" />
-              <span>個人資料</span>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/settings" className="w-full cursor-pointer">
-              <Settings className="mr-2 h-4 w-4" />
-              <span>設定</span>
-            </Link>
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
+        <DropdownMenuItem asChild>
+          <Link href={`/profile/${profile.id}`} className="cursor-pointer">
+            個人主頁
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/create" className="cursor-pointer">
+            發布貼文
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="cursor-pointer" onClick={handleLogout}>
+        <ProfileSettingsDialog profile={profile}>
+          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+            設定
+          </DropdownMenuItem>
+        </ProfileSettingsDialog>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="text-red-600 focus:text-red-600 focus:bg-red-100"
+          onSelect={handleSignOut}
+        >
           <LogOut className="mr-2 h-4 w-4" />
-          <span>登出</span>
+          登出
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -31,6 +31,29 @@ export type User = {
   avatar_url: string | null
 }
 
+export type Like = {
+  id: string
+  post_id: string
+  user_id: string
+  created_at: string
+}
+
+export type Comment = {
+  id: string
+  post_id: string
+  user_id: string
+  content: string
+  created_at: string
+  profiles?: Profile
+}
+
+export type Share = {
+  id: string
+  post_id: string
+  user_id: string | null
+  created_at: string
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -48,6 +71,21 @@ export type Database = {
         Row: User
         Insert: Omit<User, 'id'>
         Update: Partial<Omit<User, 'id'>>
+      }
+      likes: {
+        Row: Like
+        Insert: Omit<Like, 'id' | 'created_at'>
+        Update: Partial<Omit<Like, 'id' | 'created_at'>>
+      }
+      comments: {
+        Row: Comment
+        Insert: Omit<Comment, 'id' | 'created_at'>
+        Update: Partial<Omit<Comment, 'id' | 'created_at'>>
+      }
+      shares: {
+        Row: Share
+        Insert: Omit<Share, 'id' | 'created_at'>
+        Update: Partial<Omit<Share, 'id' | 'created_at'>>
       }
     }
   }

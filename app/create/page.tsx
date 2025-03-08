@@ -220,7 +220,14 @@ export default function CreatePage() {
           location,
           created_at: now,
         })
-        .select()
+        .select(`
+          *,
+          profiles!fk_posts_profiles (
+            id,
+            username,
+            avatar_url
+          )
+        `)
         .single()
 
       if (insertError) {
