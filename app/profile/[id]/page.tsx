@@ -9,10 +9,10 @@ import { formatDistanceToNow } from "date-fns"
 import { zhTW } from "date-fns/locale"
 import { PostActions } from "@/components/PostActions"
 import type { Database } from "@/lib/types/database.types"
+import type { Metadata } from "next"
 
-type Props = {
+interface Props {
   params: { id: string }
-  searchParams: { [key: string]: string | string[] | undefined }
 }
 
 export default async function ProfilePage({ params }: Props) {
