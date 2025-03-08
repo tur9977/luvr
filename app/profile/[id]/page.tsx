@@ -10,12 +10,11 @@ import { zhTW } from "date-fns/locale"
 import { PostActions } from "@/components/PostActions"
 import type { Database } from "@/lib/types/database.types"
 
-type PageProps = {
+export default async function ProfilePage({
+  params,
+}: {
   params: { id: string }
-  searchParams?: { [key: string]: string | string[] | undefined }
-}
-
-export default async function ProfilePage({ params, searchParams }: PageProps) {
+}) {
   const supabase = createServerComponentClient<Database>({ cookies })
 
   // 獲取用戶資料
