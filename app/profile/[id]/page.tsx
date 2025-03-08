@@ -10,11 +10,13 @@ import { zhTW } from "date-fns/locale"
 import { PostActions } from "@/components/PostActions"
 import type { Database } from "@/lib/types/database.types"
 
-export default async function ProfilePage({
-  params,
-}: {
-  params: { id: string }
-}) {
+interface PageProps {
+  params: {
+    id: string
+  }
+}
+
+const ProfilePage = async ({ params }: PageProps) => {
   const supabase = createServerComponentClient<Database>({ cookies })
 
   // 獲取用戶資料
@@ -196,4 +198,6 @@ export default async function ProfilePage({
       </Tabs>
     </main>
   )
-} 
+}
+
+export default ProfilePage 
