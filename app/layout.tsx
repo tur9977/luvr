@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
-import "@/styles/globals.css"
 import { Inter } from "next/font/google"
+import "./globals.css"
 import { SiteHeader } from "@/components/site-header"
 import { Toaster } from "sonner"
 import { ThemeProvider } from '@/components/theme-provider'
@@ -19,15 +19,21 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-TW" suppressHydrationWarning>
-      <body className={inter.className}>
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </head>
+      <body className={`${inter.className} min-h-screen bg-background antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          <SiteHeader />
-          {children}
+          <div className="relative flex min-h-screen flex-col">
+            <SiteHeader />
+            <main className="flex-1">{children}</main>
+          </div>
           <Toaster richColors position="top-center" />
         </ThemeProvider>
       </body>
