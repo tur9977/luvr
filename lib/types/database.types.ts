@@ -54,6 +54,67 @@ export type Share = {
   created_at: string
 }
 
+export type AdminRole = 'super_admin' | 'admin' | 'moderator'
+
+export interface AdminRoleRecord {
+  id: string
+  user_id: string
+  role: AdminRole
+  created_at: string
+  updated_at: string
+}
+
+export type ReportType = 'post' | 'comment'
+export type ReportStatus = 'pending' | 'processing' | 'resolved' | 'rejected'
+export type ReportReason = 'spam' | 'harassment' | 'hate_speech' | 'violence' | 'nudity' | 'copyright' | 'other'
+
+export interface Report {
+  id: string
+  reporter_id: string | null
+  target_type: ReportType
+  target_id: string
+  reason: ReportReason
+  description: string | null
+  status: ReportStatus
+  handler_id: string | null
+  handled_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ActionType = 'ignore' | 'delete_content' | 'warn_user' | 'temp_ban' | 'permanent_ban'
+
+export interface ReportAction {
+  id: string
+  report_id: string
+  admin_id: string | null
+  action: ActionType
+  note: string | null
+  created_at: string
+}
+
+export interface UserBan {
+  id: string
+  user_id: string
+  admin_id: string | null
+  reason: string
+  start_at: string
+  end_at: string | null
+  created_at: string
+}
+
+export type LogAction = 'login' | 'logout' | 'create' | 'update' | 'delete' | 'ban' | 'unban'
+
+export interface AdminLog {
+  id: string
+  admin_id: string | null
+  action: LogAction
+  target_type: string
+  target_id: string | null
+  details: Record<string, any> | null
+  created_at: string
+}
+
 export type Database = {
   public: {
     Tables: {
