@@ -2,9 +2,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { CalendarDays, Heart, MessageCircle, Share2 } from "lucide-react"
+import { CalendarDays } from "lucide-react"
 import Link from "next/link"
-import Image from "next/image"
+import NextImage from "next/image"
 import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 import { formatDistanceToNow } from "date-fns"
@@ -12,6 +12,7 @@ import { zhTW } from "date-fns/locale"
 import type { Database } from "@/lib/types/database.types"
 import { PostActions } from "@/components/PostActions"
 
+export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 type Post = Database['public']['Tables']['posts']['Row']
@@ -38,8 +39,6 @@ interface PostWithProfile extends Post {
 async function getPosts(): Promise<PostWithProfile[]> {
   try {
     const supabase = createServerComponentClient<Database>({ cookies })
-    
-    console.log('開始獲取貼文...')
     
     const { data: posts, error: postsError } = await supabase
       .from('posts')
@@ -71,7 +70,6 @@ async function getPosts(): Promise<PostWithProfile[]> {
     }
 
     if (!posts || posts.length === 0) {
-      console.log('沒有找到任何貼文')
       return []
     }
 
@@ -94,7 +92,6 @@ async function getPosts(): Promise<PostWithProfile[]> {
         }
       })
     } else {
-      // 如果用戶未登入，設置默認值
       posts.forEach(post => {
         post.has_liked = false
         post._count = {
@@ -105,7 +102,6 @@ async function getPosts(): Promise<PostWithProfile[]> {
       })
     }
 
-    console.log('成功獲取貼文:', posts)
     return posts as PostWithProfile[]
   } catch (error) {
     console.error('獲取貼文時發生異常:', error)
@@ -115,7 +111,6 @@ async function getPosts(): Promise<PostWithProfile[]> {
 
 export default async function Home() {
   const posts = await getPosts()
-  console.log('首頁組件中的貼文:', posts)
 
   return (
     <main className="container max-w-2xl mx-auto p-4">
@@ -167,7 +162,7 @@ export default async function Home() {
                     </div>
                   ) : (
                     <div className="relative aspect-square">
-                      <Image
+                      <NextImage
                         src={post.media_url}
                         alt={post.caption || "Post image"}
                         fill
@@ -203,7 +198,7 @@ export default async function Home() {
           <Card>
             <CardContent className="p-0">
               <div className="relative">
-                <Image
+                <NextImage
                   src="/placeholder.svg"
                   alt="Event cover"
                   width={600}
@@ -233,7 +228,7 @@ export default async function Home() {
           <Card>
             <CardContent className="p-0">
               <div className="relative">
-                <Image
+                <NextImage
                   src="/placeholder.svg"
                   alt="Event cover"
                   width={600}

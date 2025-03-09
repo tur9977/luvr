@@ -11,11 +11,17 @@ export async function middleware(req: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession()
 
-  // 如果用戶未登入且訪問受保護的路徑，重定向到登入頁面
-  if (!session && req.nextUrl.pathname.match(/^\/(?:profile|create|settings)/)) {
-    const redirectUrl = new URL('/auth', req.url)
-    redirectUrl.searchParams.set('redirect', req.nextUrl.pathname)
-    return NextResponse.redirect(redirectUrl)
+  // 如果用戶未登入且訪問需要認證的頁面，重定向到登入頁面
+  if (!session && (
+    req.nextUrl.pathname.startsWith('/create') ||
+    req.nextUrl.pathname.startsWith('/profile')
+  )) {
+    return NextResponse.redirect(new URL('/auth', req.url))
+  }
+
+  // 如果用戶已登入且訪問登入頁面，重定向到首頁
+  if (session && req.nextUrl.pathname.startsWith('/auth')) {
+    return NextResponse.redirect(new URL('/', req.url))
   }
 
   return res
@@ -24,14 +30,8 @@ export async function middleware(req: NextRequest) {
 // 配置需要認證的路徑
 export const config = {
   matcher: [
-    /*
-     * 匹配所有需要認證的路徑:
-     * - /profile
-     * - /create
-     * - /settings
-     */
+    '/create',
     '/profile/:path*',
-    '/create/:path*',
-    '/settings/:path*',
+    '/auth',
   ],
 } 
