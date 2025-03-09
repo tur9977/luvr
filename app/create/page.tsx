@@ -126,17 +126,42 @@ export default function CreatePage() {
 
     try {
       setIsUploading(true)
-      console.log("開始上傳媒體文件...")
+      console.log("開始上傳媒體文件...", {
+        fileName: mediaFile.name,
+        fileType: mediaFile.type,
+        fileSize: `${(mediaFile.size / (1024 * 1024)).toFixed(2)}MB`
+      })
 
       // 上傳媒體文件
       const mediaExt = mediaFile.name.split(".").pop()
       const mediaPath = `${profile.id}/${Date.now()}.${mediaExt}`
+
+      // 檢查文件類型和大小
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime']
+      if (!allowedTypes.includes(mediaFile.type)) {
+        throw new Error(`不支持的文件類型: ${mediaFile.type}`)
+      }
+
+      if (mediaFile.size > 52428800) { // 50MB in bytes
+        throw new Error(`文件大小超過限制: ${(mediaFile.size / (1024 * 1024)).toFixed(2)}MB`)
+      }
+
       const { error: uploadError, data: uploadData } = await supabase.storage
         .from("posts")
-        .upload(mediaPath, mediaFile)
+        .upload(mediaPath, mediaFile, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: mediaFile.type
+        })
 
       if (uploadError) {
-        console.error("媒體文件上傳錯誤:", uploadError)
+        console.error("媒體文件上傳錯誤:", {
+          error: uploadError,
+          message: uploadError.message,
+          statusCode: uploadError.statusCode,
+          name: uploadError.name,
+          details: uploadError.details
+        })
         throw uploadError
       }
 
@@ -155,41 +180,72 @@ export default function CreatePage() {
         console.log("開始生成視頻縮圖...")
         const video = document.createElement("video")
         video.src = URL.createObjectURL(mediaFile)
-        await new Promise((resolve) => {
-          video.onloadeddata = () => {
-            video.currentTime = 1
-            video.onseeked = resolve
-          }
-        })
-
-        const canvas = document.createElement("canvas")
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
-        const ctx = canvas.getContext("2d")
-        ctx?.drawImage(video, 0, 0)
         
-        const thumbnailBlob = await new Promise<Blob>((resolve) => {
-          canvas.toBlob((blob) => resolve(blob!), "image/jpeg", 0.7)
-        })
+        try {
+          await new Promise((resolve, reject) => {
+            video.onloadeddata = () => {
+              try {
+                video.currentTime = 1
+                video.onseeked = resolve
+                video.onerror = reject
+              } catch (err) {
+                reject(err)
+              }
+            }
+            video.onerror = reject
+          })
 
-        const thumbnailPath = `${profile.id}/${Date.now()}_thumb.jpg`
-        const { error: thumbError, data: thumbData } = await supabase.storage
-          .from("posts")
-          .upload(thumbnailPath, thumbnailBlob)
+          const canvas = document.createElement("canvas")
+          canvas.width = video.videoWidth
+          canvas.height = video.videoHeight
+          const ctx = canvas.getContext("2d")
+          if (!ctx) throw new Error("無法創建 canvas context")
+          
+          ctx.drawImage(video, 0, 0)
+          
+          const thumbnailBlob = await new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob(
+              (blob) => {
+                if (blob) resolve(blob)
+                else reject(new Error("無法創建縮圖"))
+              },
+              "image/jpeg",
+              0.7
+            )
+          })
 
-        if (thumbError) {
-          console.error("縮圖上傳錯誤:", thumbError)
-          throw thumbError
+          const thumbnailPath = `${profile.id}/${Date.now()}_thumb.jpg`
+          const { error: thumbError, data: thumbData } = await supabase.storage
+            .from("posts")
+            .upload(thumbnailPath, thumbnailBlob, {
+              cacheControl: "3600",
+              upsert: false,
+              contentType: "image/jpeg"
+            })
+
+          if (thumbError) {
+            console.error("縮圖上傳錯誤:", {
+              error: thumbError,
+              message: thumbError.message,
+              statusCode: thumbError.statusCode
+            })
+            throw thumbError
+          }
+
+          console.log("縮圖上傳成功:", thumbData)
+
+          const { data: { publicUrl: thumbUrl } } = supabase.storage
+            .from("posts")
+            .getPublicUrl(thumbnailPath)
+
+          thumbnailUrl = thumbUrl
+          console.log("獲取到縮圖 URL:", thumbnailUrl)
+        } catch (err) {
+          console.error("生成縮圖過程中出錯:", err)
+          // 繼續執行，即使沒有縮圖
+        } finally {
+          URL.revokeObjectURL(video.src)
         }
-
-        console.log("縮圖上傳成功:", thumbData)
-
-        const { data: { publicUrl: thumbUrl } } = supabase.storage
-          .from("posts")
-          .getPublicUrl(thumbnailPath)
-
-        thumbnailUrl = thumbUrl
-        console.log("獲取到縮圖 URL:", thumbnailUrl)
       }
 
       // 獲取媒體寬高比和時長
@@ -242,7 +298,6 @@ export default function CreatePage() {
         description: "您的貼文已成功發布",
       })
 
-      // 使用 replace 而不是 push，這樣用戶按返回鍵時不會回到發文頁面
       router.replace("/")
       router.refresh()
     } catch (error) {

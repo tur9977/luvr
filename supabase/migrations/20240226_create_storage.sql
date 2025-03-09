@@ -24,9 +24,17 @@ on storage.objects for delete
 to authenticated
 using (bucket_id = 'posts' AND (storage.foldername(name))[1] = auth.uid()::text);
 
--- 設置文件大小限制（20MB）和允許的文件類型
+-- 設置文件大小限制（50MB）和允許的文件類型
 update storage.buckets
 set public = true,
-    file_size_limit = 20971520,
-    allowed_mime_types = array['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm']
+    file_size_limit = 52428800,
+    allowed_mime_types = array[
+      'image/jpeg', 
+      'image/png', 
+      'image/gif', 
+      'image/webp', 
+      'video/mp4', 
+      'video/webm', 
+      'video/quicktime'  -- 增加對 .mov 格式的支持
+    ]
 where id = 'posts'; 

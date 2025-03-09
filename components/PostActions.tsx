@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Heart, MessageCircle, Share2 } from "lucide-react"
+import { Heart, MessageCircle, Share2, MoreVertical, Trash2 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/lib/supabase/client"
 import { useUser } from "@/hooks/useUser"
@@ -13,14 +13,33 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { formatDistanceToNow } from "date-fns"
 import { zhTW } from "date-fns/locale"
+import { useRouter } from "next/navigation"
 import type { Comment } from "@/lib/types/database.types"
 
 interface PostActionsProps {
   postId: string
+  userId: string
   initialLikesCount: number
   initialCommentsCount: number
   initialSharesCount: number
@@ -30,6 +49,7 @@ interface PostActionsProps {
 
 export function PostActions({
   postId,
+  userId,
   initialLikesCount,
   initialCommentsCount,
   initialSharesCount,
@@ -37,6 +57,7 @@ export function PostActions({
   initialComments = [],
 }: PostActionsProps) {
   const { toast } = useToast()
+  const router = useRouter()
   const { user } = useUser()
   const [likesCount, setLikesCount] = useState(initialLikesCount)
   const [commentsCount, setCommentsCount] = useState(initialCommentsCount)
@@ -46,7 +67,11 @@ export function PostActions({
   const [newComment, setNewComment] = useState("")
   const [isLoadingComments, setIsLoadingComments] = useState(false)
   const [isCommentsOpen, setIsCommentsOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [selectedCommentId, setSelectedCommentId] = useState<string | null>(null)
 
+  const isPostOwner = user?.id === userId
+  
   // 當初始評論改變時更新狀態
   useEffect(() => {
     setComments(initialComments)
@@ -184,6 +209,63 @@ export function PostActions({
     }
   }
 
+  // 刪除評論
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      const { error } = await supabase
+        .from("comments")
+        .delete()
+        .eq("id", commentId)
+        .eq("user_id", user?.id)
+
+      if (error) throw error
+
+      setComments((prev) => prev.filter((comment) => comment.id !== commentId))
+      setCommentsCount((prev) => prev - 1)
+      setSelectedCommentId(null)
+
+      toast({
+        title: "刪除成功",
+        description: "評論已刪除",
+      })
+    } catch (error) {
+      console.error("刪除評論失敗:", error)
+      toast({
+        variant: "destructive",
+        title: "刪除失敗",
+        description: "請稍後再試",
+      })
+    }
+  }
+
+  // 刪除貼文
+  const handleDeletePost = async () => {
+    try {
+      const { error } = await supabase
+        .from("posts")
+        .delete()
+        .eq("id", postId)
+        .eq("user_id", user?.id)
+
+      if (error) throw error
+
+      toast({
+        title: "刪除成功",
+        description: "貼文已刪除",
+      })
+
+      // 重新整理頁面
+      router.refresh()
+    } catch (error) {
+      console.error("刪除貼文失敗:", error)
+      toast({
+        variant: "destructive",
+        title: "刪除失敗",
+        description: "請稍後再試",
+      })
+    }
+  }
+
   // 分享貼文
   const handleShare = async () => {
     try {
@@ -258,7 +340,7 @@ export function PostActions({
               )}
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
+          <DialogContent>
             <DialogHeader>
               <DialogTitle>評論</DialogTitle>
             </DialogHeader>
@@ -285,16 +367,47 @@ export function PostActions({
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">
-                          {comment.profiles?.username || "未知用戶"}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(comment.created_at), {
-                            addSuffix: true,
-                            locale: zhTW,
-                          })}
-                        </span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">
+                            {comment.profiles?.username || "未知用戶"}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(new Date(comment.created_at), {
+                              addSuffix: true,
+                              locale: zhTW,
+                            })}
+                          </span>
+                        </div>
+                        {(user?.id === comment.user_id || isPostOwner) && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setSelectedCommentId(comment.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>確定要刪除這則評論嗎？</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  此操作無法復原。
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>取消</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteComment(comment.id)}
+                                >
+                                  刪除
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
                       </div>
                       <p className="text-sm mt-1">{comment.content}</p>
                     </div>
@@ -302,7 +415,7 @@ export function PostActions({
                 ))
               )}
             </div>
-            <div className="flex gap-2 pt-4 border-t">
+            <div className="flex gap-2 mt-4">
               <Textarea
                 placeholder="發表評論..."
                 value={newComment}
@@ -321,6 +434,33 @@ export function PostActions({
           )}
         </Button>
       </div>
+
+      {isPostOwner && (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <MoreVertical className="h-5 w-5" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>確定要刪除這則貼文嗎？</AlertDialogTitle>
+              <AlertDialogDescription>
+                此操作將會永久刪除貼文及其所有評論、按讚和分享記錄。此操作無法復原。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeletePost}
+                className="bg-red-500 hover:bg-red-600"
+              >
+                刪除
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   )
 } 

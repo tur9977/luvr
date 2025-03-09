@@ -181,6 +181,7 @@ export default async function Home() {
                 <CardFooter className="flex justify-between p-2">
                   <PostActions
                     postId={post.id}
+                    userId={post.user_id}
                     initialLikesCount={post._count?.likes || 0}
                     initialCommentsCount={post._count?.comments || 0}
                     initialSharesCount={post._count?.shares || 0}

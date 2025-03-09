@@ -176,6 +176,7 @@ export default async function ProfilePage({ params }: Props) {
                   <div className="p-4">
                     <PostActions
                       postId={post.id}
+                      userId={post.user_id}
                       initialLikesCount={post._count.likes}
                       initialCommentsCount={post._count.comments}
                       initialSharesCount={post._count.shares}
