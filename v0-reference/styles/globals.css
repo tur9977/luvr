@@ -2,85 +2,73 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-}
-
 @layer base {
   :root {
     --background: 0 0% 100%;
     --foreground: 260 30% 25%;
+
     --card: 0 0% 100%;
     --card-foreground: 260 30% 25%;
+
     --popover: 0 0% 100%;
     --popover-foreground: 260 30% 25%;
+
+    /* 主色調：深邃薰衣草紫 */
     --primary: 260 35% 52%;
     --primary-foreground: 0 0% 100%;
+
+    /* 輔助色：現代灰 */
     --secondary: 240 10% 84%;
     --secondary-foreground: 260 30% 25%;
+
     --muted: 240 10% 94%;
     --muted-foreground: 240 10% 40%;
+
+    /* 強調色：深灰 */
     --accent: 240 10% 70%;
     --accent-foreground: 260 30% 25%;
+
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
+
+    /* 邊框和輸入框使用淺灰色 */
     --border: 240 10% 90%;
     --input: 240 10% 90%;
     --ring: 260 35% 52%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+
     --radius: 0.75rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
   .dark {
     --background: 240 10% 10%;
     --foreground: 0 0% 95%;
+
     --card: 240 10% 12%;
     --card-foreground: 0 0% 95%;
+
     --popover: 240 10% 12%;
     --popover-foreground: 0 0% 95%;
+
+    /* 深色模式下的紫色 */
     --primary: 260 35% 62%;
     --primary-foreground: 0 0% 100%;
+
+    /* 深色模式下的灰色 */
     --secondary: 240 10% 74%;
     --secondary-foreground: 260 30% 25%;
+
     --muted: 240 10% 20%;
     --muted-foreground: 240 10% 70%;
+
     --accent: 240 10% 60%;
     --accent-foreground: 260 30% 25%;
+
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 85.7% 97.3%;
+
     --border: 240 10% 20%;
     --input: 240 10% 20%;
     --ring: 260 35% 62%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
 
@@ -92,3 +80,4 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
