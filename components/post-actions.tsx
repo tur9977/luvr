@@ -137,9 +137,12 @@ export function PostActions({
         id: comment.id,
         content: comment.content,
         created_at: comment.created_at,
-        profiles: {
+        profiles: comment.profiles ? {
           username: comment.profiles.username,
           avatar_url: comment.profiles.avatar_url
+        } : {
+          username: '匿名用戶',
+          avatar_url: null
         }
       }))
 
@@ -306,19 +309,19 @@ export function PostActions({
                     <div key={comment.id} className="flex gap-2">
                       <Avatar className="h-8 w-8">
                         <AvatarImage
-                          src={comment.profiles.avatar_url || undefined}
+                          src={comment.profiles?.avatar_url || undefined}
                         />
                         <AvatarFallback>
-                          {comment.profiles.username.charAt(0).toUpperCase()}
+                          {comment.profiles?.username?.charAt(0).toUpperCase() || '?'}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <Link
-                            href={`/profile/${comment.profiles.username}`}
+                            href={`/profile/${comment.profiles?.username || 'anonymous'}`}
                             className="text-sm font-semibold hover:underline"
                           >
-                            {comment.profiles.username}
+                            {comment.profiles?.username || '匿名用戶'}
                           </Link>
                           <span className="text-xs text-muted-foreground">
                             {formatDistanceToNow(new Date(comment.created_at), {

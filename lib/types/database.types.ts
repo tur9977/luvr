@@ -1,4 +1,4 @@
-export type Profile = {
+export interface Profile {
   id: string
   username: string | null
   full_name: string | null
@@ -115,7 +115,7 @@ export interface AdminLog {
   created_at: string
 }
 
-export type Database = {
+export interface Database {
   public: {
     Tables: {
       profiles: {

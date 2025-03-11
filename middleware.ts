@@ -2,13 +2,15 @@ import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
-  const supabase = createMiddlewareClient({ req, res })
+export async function middleware(request: NextRequest) {
+  const response = NextResponse.next()
+  const supabase = createMiddlewareClient({ req: request, res: response })
+
+  // Refresh session if expired - required for Server Components
   const { data: { session } } = await supabase.auth.getSession()
 
   // 如果是訪問管理員登入頁面
-  if (req.nextUrl.pathname === '/admin/login') {
+  if (request.nextUrl.pathname === '/admin/login') {
     // 如果已經登入，檢查是否是管理員
     if (session) {
       const { data: adminRole } = await supabase
@@ -19,18 +21,18 @@ export async function middleware(req: NextRequest) {
 
       // 如果是管理員，重定向到管理員儀表板
       if (adminRole) {
-        return NextResponse.redirect(new URL('/admin', req.url))
+        return NextResponse.redirect(new URL('/admin', request.url))
       }
     }
     // 如果未登入或不是管理員，允許訪問登入頁面
-    return res
+    return response
   }
 
   // 如果是訪問其他管理員頁面
-  if (req.nextUrl.pathname.startsWith('/admin')) {
+  if (request.nextUrl.pathname.startsWith('/admin')) {
     // 如果未登入，重定向到登入頁面
     if (!session) {
-      return NextResponse.redirect(new URL('/admin/login', req.url))
+      return NextResponse.redirect(new URL('/admin/login', request.url))
     }
 
     // 檢查是否是管理員
@@ -42,24 +44,24 @@ export async function middleware(req: NextRequest) {
 
     // 如果不是管理員，重定向到首頁
     if (!adminRole) {
-      return NextResponse.redirect(new URL('/', req.url))
+      return NextResponse.redirect(new URL('/', request.url))
     }
   }
 
   // 如果用戶未登入且訪問需要認證的頁面，重定向到登入頁面
   if (!session && (
-    req.nextUrl.pathname.startsWith('/create') ||
-    req.nextUrl.pathname.startsWith('/profile')
+    request.nextUrl.pathname.startsWith('/create') ||
+    request.nextUrl.pathname.startsWith('/profile')
   )) {
-    return NextResponse.redirect(new URL('/auth', req.url))
+    return NextResponse.redirect(new URL('/auth', request.url))
   }
 
   // 如果用戶已登入且訪問登入頁面，重定向到首頁
-  if (session && req.nextUrl.pathname.startsWith('/auth')) {
-    return NextResponse.redirect(new URL('/', req.url))
+  if (session && request.nextUrl.pathname.startsWith('/auth')) {
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
-  return res
+  return response
 }
 
 // 配置需要認證的路徑
@@ -68,6 +70,6 @@ export const config = {
     '/create',
     '/profile/:path*',
     '/auth',
-    '/admin/:path*'
+    '/auth/callback',
   ],
 } 
