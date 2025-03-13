@@ -17,6 +17,11 @@ type Comment = Database['public']['Tables']['comments']['Row'] & {
 }
 
 export interface PostWithProfile extends Post {
+  id: string
+  user_id: string
+  caption: string | null
+  media_url: string | null
+  created_at: string
   profiles: Profile
   _count?: {
     likes: number

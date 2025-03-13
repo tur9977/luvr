@@ -33,7 +33,9 @@ async function getPosts() {
         supabase.from('likes').select('*', { count: 'exact', head: true }).eq('post_id', post.id),
         supabase.from('comments').select('*', { count: 'exact', head: true }).eq('post_id', post.id),
         supabase.from('shares').select('*', { count: 'exact', head: true }).eq('post_id', post.id),
-        supabase.from('reports').select('*', { count: 'exact', head: true }).eq('post_id', post.id)
+        supabase.from('reports').select('*', { count: 'exact', head: true })
+          .eq('reported_content_id', post.id)
+          .eq('status', 'pending')
       ])
 
       return {

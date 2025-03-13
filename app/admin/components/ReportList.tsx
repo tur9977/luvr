@@ -8,20 +8,29 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { formatDistanceToNow } from "date-fns"
 import { zhTW } from "date-fns/locale"
 import { toast } from "sonner"
-import type { Database } from "@/lib/types/database.types"
 
-type Report = Database['public']['Tables']['reports']['Row'] & {
+type Report = {
+  id: string
+  reporter_id: string
+  reported_content_id: string
+  reported_user_id: string
+  reason: string
+  status: 'pending' | 'approved' | 'rejected'
+  admin_note: string | null
+  created_at: string
+  resolved_at: string | null
+  resolved_by: string | null
   posts: {
     id: string
-    caption: string
-    media_url: string
+    caption: string | null
+    media_url: string | null
     user_id: string
     profiles: {
       username: string
       avatar_url: string | null
     }
   } | null
-  profiles: {
+  reporter: {
     username: string
     avatar_url: string | null
   } | null
@@ -33,41 +42,20 @@ interface ReportListProps {
 
 export function ReportList({ reports: initialReports }: ReportListProps) {
   const [reports, setReports] = useState(initialReports)
-  const supabase = createClientComponentClient<Database>()
+  const supabase = createClientComponentClient()
 
   const handleAction = async (reportId: string, action: 'approve' | 'reject') => {
     try {
-      const report = reports.find(r => r.id === reportId)
-      if (!report || !report.posts) return
+      const { error } = await supabase
+        .rpc('admin_handle_report', {
+          report_id: reportId,
+          action: action
+        })
 
-      if (action === 'approve') {
-        // 刪除貼文
-        const { error: deleteError } = await supabase
-          .from('posts')
-          .delete()
-          .eq('id', report.posts.id)
+      if (error) throw error
 
-        if (deleteError) throw deleteError
-
-        // 更新檢舉狀態
-        await supabase
-          .from('reports')
-          .update({ status: 'approved', resolved_at: new Date().toISOString() })
-          .eq('id', reportId)
-
-        toast.success('已刪除違規貼文')
-      } else {
-        // 拒絕檢舉
-        await supabase
-          .from('reports')
-          .update({ status: 'rejected', resolved_at: new Date().toISOString() })
-          .eq('id', reportId)
-
-        toast.success('已拒絕檢舉')
-      }
-
-      // 更新列表
       setReports(reports.filter(r => r.id !== reportId))
+      toast.success(action === 'approve' ? '已刪除違規貼文' : '已拒絕檢舉')
     } catch (error) {
       console.error('處理檢舉時出錯:', error)
       toast.error('處理檢舉時發生錯誤')
@@ -89,14 +77,14 @@ export function ReportList({ reports: initialReports }: ReportListProps) {
           <CardHeader>
             <div className="flex items-center gap-4">
               <Avatar>
-                <AvatarImage src={report.profiles?.avatar_url || '/placeholder.svg'} />
+                <AvatarImage src={report.reporter?.avatar_url || '/placeholder.svg'} />
                 <AvatarFallback>
-                  {(report.profiles?.username || 'U').charAt(0).toUpperCase()}
+                  {(report.reporter?.username || 'U').charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div>
                 <p className="text-sm font-medium">
-                  {report.profiles?.username || '未知用戶'} 檢舉了一則貼文
+                  {report.reporter?.username || '未知用戶'} 檢舉了一則貼文
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(report.created_at), {
@@ -126,16 +114,16 @@ export function ReportList({ reports: initialReports }: ReportListProps) {
                 <div className="relative aspect-square rounded-md overflow-hidden mb-2">
                   <img
                     src={report.posts.media_url}
-                    alt="Reported content"
+                    alt="被檢舉的內容"
                     className="object-cover w-full h-full"
                   />
                 </div>
               )}
-              <p className="text-sm">{report.posts?.caption}</p>
+              <p className="text-sm">{report.posts?.caption || '無文字內容'}</p>
             </div>
             <div className="rounded-lg border p-4">
               <p className="text-sm font-medium mb-2">檢舉原因</p>
-              <p className="text-sm">{report.reason}</p>
+              <p className="text-sm whitespace-pre-wrap break-words">{report.reason}</p>
             </div>
           </CardContent>
           <CardFooter className="flex justify-end gap-2">
