@@ -122,15 +122,17 @@ export function PostHeader({ post }: PostHeaderProps) {
     <>
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center gap-3">
-          <Avatar>
-            <AvatarImage src={post.profiles.avatar_url || '/placeholder.svg'} />
-            <AvatarFallback>
-              {post.profiles.username?.charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+          <Link href={`/profile/${post.user_id}`} className="hover:opacity-75">
+            <Avatar>
+              <AvatarImage src={post.profiles.avatar_url || '/placeholder.svg'} />
+              <AvatarFallback>
+                {post.profiles.username?.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          </Link>
           <div>
             <Link
-              href={`/u/${post.profiles.username}`}
+              href={`/profile/${post.user_id}`}
               className="text-sm font-medium hover:underline"
             >
               {post.profiles.username}

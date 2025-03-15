@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
@@ -46,19 +47,23 @@ export function ReportList({ reports: initialReports }: ReportListProps) {
 
   const handleAction = async (reportId: string, action: 'approve' | 'reject') => {
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .rpc('admin_handle_report', {
           report_id: reportId,
           action: action
         })
 
-      if (error) throw error
+      if (error) {
+        console.error('處理檢舉時出錯:', error)
+        toast.error(`處理檢舉時發生錯誤: ${error.message}`)
+        return
+      }
 
       setReports(reports.filter(r => r.id !== reportId))
       toast.success(action === 'approve' ? '已刪除違規貼文' : '已拒絕檢舉')
     } catch (error) {
       console.error('處理檢舉時出錯:', error)
-      toast.error('處理檢舉時發生錯誤')
+      toast.error('處理檢舉時發生錯誤，請稍後再試')
     }
   }
 
@@ -76,15 +81,20 @@ export function ReportList({ reports: initialReports }: ReportListProps) {
         <Card key={report.id}>
           <CardHeader>
             <div className="flex items-center gap-4">
-              <Avatar>
-                <AvatarImage src={report.reporter?.avatar_url || '/placeholder.svg'} />
-                <AvatarFallback>
-                  {(report.reporter?.username || 'U').charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <Link href={`/profile/${report.reporter_id}`} className="hover:opacity-75">
+                <Avatar>
+                  <AvatarImage src={report.reporter?.avatar_url || '/placeholder.svg'} />
+                  <AvatarFallback>
+                    {(report.reporter?.username || 'U').charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
               <div>
                 <p className="text-sm font-medium">
-                  {report.reporter?.username || '未知用戶'} 檢舉了一則貼文
+                  <Link href={`/profile/${report.reporter_id}`} className="hover:underline">
+                    {report.reporter?.username || '未知用戶'}
+                  </Link>
+                  {' '}檢舉了一則貼文
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(report.created_at), {
@@ -98,15 +108,19 @@ export function ReportList({ reports: initialReports }: ReportListProps) {
           <CardContent className="space-y-4">
             <div className="rounded-lg border p-4">
               <div className="flex items-center gap-4 mb-2">
-                <Avatar>
-                  <AvatarImage src={report.posts?.profiles.avatar_url || '/placeholder.svg'} />
-                  <AvatarFallback>
-                    {(report.posts?.profiles.username || 'U').charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                <Link href={`/profile/${report.posts?.user_id}`} className="hover:opacity-75">
+                  <Avatar>
+                    <AvatarImage src={report.posts?.profiles.avatar_url || '/placeholder.svg'} />
+                    <AvatarFallback>
+                      {(report.posts?.profiles.username || 'U').charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                </Link>
                 <div>
                   <p className="text-sm font-medium">
-                    {report.posts?.profiles.username || '未知用戶'}
+                    <Link href={`/profile/${report.posts?.user_id}`} className="hover:underline">
+                      {report.posts?.profiles.username || '未知用戶'}
+                    </Link>
                   </p>
                 </div>
               </div>

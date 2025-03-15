@@ -4,16 +4,17 @@ alter table public.profiles add column if not exists role text default 'user' ch
 -- Create reports table
 create table if not exists public.reports (
   id uuid default gen_random_uuid() primary key,
-  post_id uuid references public.posts(id) on delete cascade,
+  reported_content_id uuid references public.posts(id) on delete cascade,
   reporter_id uuid references auth.users(id) on delete cascade,
+  reported_user_id uuid references auth.users(id) on delete cascade,
   reason text not null,
   status text default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  admin_note text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   resolved_at timestamp with time zone,
-  UNIQUE(post_id, reporter_id),
+  resolved_by uuid references auth.users(id) on delete set null,
   
-  constraint fk_reports_posts foreign key (post_id) references public.posts(id) on delete cascade,
-  constraint fk_reports_profiles foreign key (reporter_id) references auth.users(id) on delete cascade
+  constraint reports_reported_content_id_reporter_id_key unique (reported_content_id, reporter_id)
 );
 
 -- Add RLS policies
@@ -58,4 +59,17 @@ $$ language plpgsql;
 create trigger update_report_resolved_at
     before update on public.reports
     for each row
-    execute function public.handle_report_status_change(); 
+    execute function public.handle_report_status_change();
+
+-- 添加表和欄位的註解
+COMMENT ON TABLE public.reports IS '用戶檢舉記錄表';
+COMMENT ON COLUMN public.reports.id IS '檢舉記錄 ID';
+COMMENT ON COLUMN public.reports.reported_content_id IS '被檢舉的內容 ID';
+COMMENT ON COLUMN public.reports.reporter_id IS '檢舉者 ID';
+COMMENT ON COLUMN public.reports.reported_user_id IS '被檢舉的用戶 ID';
+COMMENT ON COLUMN public.reports.reason IS '檢舉原因';
+COMMENT ON COLUMN public.reports.status IS '檢舉狀態：pending（待處理）、approved（已批准）、rejected（已拒絕）';
+COMMENT ON COLUMN public.reports.admin_note IS '管理員處理備註';
+COMMENT ON COLUMN public.reports.created_at IS '檢舉時間';
+COMMENT ON COLUMN public.reports.resolved_at IS '處理時間';
+COMMENT ON COLUMN public.reports.resolved_by IS '處理者 ID'; 
