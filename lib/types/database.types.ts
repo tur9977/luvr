@@ -1,153 +1,309 @@
-export type Profile = {
-  id: string
-  username: string | null
-  full_name: string | null
-  avatar_url: string | null
-  location: string | null
-  bio: string | null
-  created_at: string
-  updated_at: string
-}
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
-export type Post = {
-  id: string
-  created_at: string
-  caption: string | null
-  location: string | null
-  media_url: string
-  media_type: 'image' | 'video'
-  thumbnail_url: string | null
-  user_id: string
-}
-
-export type User = {
-  id: string
-  email: string
-  raw_user_meta_data: {
-    username?: string
-    avatar_url?: string
-  } | null
-  username: string | null
-  avatar_url: string | null
-}
-
-export type Like = {
-  id: string
-  post_id: string
-  user_id: string
-  created_at: string
-}
-
-export type Comment = {
-  id: string
-  post_id: string
-  user_id: string
-  content: string
-  created_at: string
-  profiles?: Profile
-}
-
-export type Share = {
-  id: string
-  post_id: string
-  user_id: string | null
-  created_at: string
-}
-
-export type AdminRole = 'super_admin' | 'admin' | 'moderator'
-
-export interface AdminRoleRecord {
-  id: string
-  user_id: string
-  role: AdminRole
-  created_at: string
-  updated_at: string
-}
-
-export type ReportType = 'post' | 'comment'
-export type ReportStatus = 'pending' | 'processing' | 'resolved' | 'rejected'
-export type ReportReason = 'spam' | 'harassment' | 'hate_speech' | 'violence' | 'nudity' | 'copyright' | 'other'
-
-export interface Report {
-  id: string
-  reporter_id: string | null
-  target_type: ReportType
-  target_id: string
-  reason: ReportReason
-  description: string | null
-  status: ReportStatus
-  handler_id: string | null
-  handled_at: string | null
-  created_at: string
-  updated_at: string
-}
-
-export type ActionType = 'ignore' | 'delete_content' | 'warn_user' | 'temp_ban' | 'permanent_ban'
-
-export interface ReportAction {
-  id: string
-  report_id: string
-  admin_id: string | null
-  action: ActionType
-  note: string | null
-  created_at: string
-}
-
-export interface UserBan {
-  id: string
-  user_id: string
-  admin_id: string | null
-  reason: string
-  start_at: string
-  end_at: string | null
-  created_at: string
-}
-
-export type LogAction = 'login' | 'logout' | 'create' | 'update' | 'delete' | 'ban' | 'unban'
-
-export interface AdminLog {
-  id: string
-  admin_id: string | null
-  action: LogAction
-  target_type: string
-  target_id: string | null
-  details: Record<string, any> | null
-  created_at: string
-}
-
-export type Database = {
+export interface Database {
   public: {
     Tables: {
-      profiles: {
-        Row: Profile
-        Insert: Omit<Profile, 'created_at' | 'updated_at'>
-        Update: Partial<Omit<Profile, 'id' | 'created_at' | 'updated_at'>>
+      comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_post_id_fkey"
+            columns: ["post_id"]
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
-      posts: {
-        Row: Post
-        Insert: Omit<Post, 'id' | 'created_at'>
-        Update: Partial<Omit<Post, 'id' | 'created_at'>>
-      }
-      users: {
-        Row: User
-        Insert: Omit<User, 'id'>
-        Update: Partial<Omit<User, 'id'>>
+      follows: {
+        Row: {
+          created_at: string
+          follower_id: string
+          following_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          follower_id: string
+          following_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          follower_id?: string
+          following_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follows_follower_id_fkey"
+            columns: ["follower_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follows_following_id_fkey"
+            columns: ["following_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       likes: {
-        Row: Like
-        Insert: Omit<Like, 'id' | 'created_at'>
-        Update: Partial<Omit<Like, 'id' | 'created_at'>>
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "likes_post_id_fkey"
+            columns: ["post_id"]
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "likes_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
-      comments: {
-        Row: Comment
-        Insert: Omit<Comment, 'id' | 'created_at'>
-        Update: Partial<Omit<Comment, 'id' | 'created_at'>>
+      posts: {
+        Row: {
+          caption: string | null
+          created_at: string
+          id: string
+          location: string | null
+          media_type: string
+          media_url: string
+          thumbnail_url: string | null
+          user_id: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          location?: string | null
+          media_type: string
+          media_url: string
+          thumbnail_url?: string | null
+          user_id: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          location?: string | null
+          media_type?: string
+          media_url?: string
+          thumbnail_url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posts_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          location: string | null
+          updated_at: string | null
+          username: string | null
+          website: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          full_name?: string | null
+          id: string
+          location?: string | null
+          updated_at?: string | null
+          username?: string | null
+          website?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          location?: string | null
+          updated_at?: string | null
+          username?: string | null
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_id_fkey"
+            columns: ["id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      reports: {
+        Row: {
+          admin_note: string | null
+          created_at: string
+          id: string
+          reason: string
+          reported_content_id: string
+          reported_user_id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string | null
+          created_at?: string
+          id?: string
+          reason: string
+          reported_content_id: string
+          reported_user_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          admin_note?: string | null
+          created_at?: string
+          id?: string
+          reason?: string
+          reported_content_id?: string
+          reported_user_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_reported_content_id_fkey"
+            columns: ["reported_content_id"]
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_reported_user_id_fkey"
+            columns: ["reported_user_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_resolved_by_fkey"
+            columns: ["resolved_by"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       shares: {
-        Row: Share
-        Insert: Omit<Share, 'id' | 'created_at'>
-        Update: Partial<Omit<Share, 'id' | 'created_at'>>
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shares_post_id_fkey"
+            columns: ["post_id"]
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shares_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
     }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
   }
-} 
+}

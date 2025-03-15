@@ -14,10 +14,24 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ProfileSettingsDialog } from "./profile-settings-dialog"
 import { LogOut } from "lucide-react"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { Button } from "@/components/ui/button"
+import { useEffect } from "react"
 
 export function UserNav() {
   const { profile } = useProfile()
   const router = useRouter()
+  const supabase = createClientComponentClient()
+
+  useEffect(() => {
+    if (profile) {
+      console.log("User profile:", {
+        id: profile.id,
+        username: profile.username,
+        role: profile.role
+      })
+    }
+  }, [profile])
 
   if (!profile) return null
 
@@ -32,17 +46,20 @@ export function UserNav() {
     }
   }
 
+  const isAdmin = profile.role === 'admin'
+  console.log("Is admin?", isAdmin)
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Avatar className="h-8 w-8 cursor-pointer">
-          <AvatarImage src={profile.avatar_url || "/placeholder.svg"} />
-          <AvatarFallback>
-            {(profile.username || "U").charAt(0).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+          <Avatar className="h-8 w-8">
+            <AvatarImage src={profile.avatar_url || "/placeholder.svg"} alt={profile.username || ''} />
+            <AvatarFallback>{profile.username?.charAt(0).toUpperCase()}</AvatarFallback>
+          </Avatar>
+        </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent className="w-56" align="end" forceMount>
         <div className="flex items-center justify-start gap-2 p-2">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">
@@ -72,6 +89,14 @@ export function UserNav() {
             設定
           </DropdownMenuItem>
         </ProfileSettingsDialog>
+        {isAdmin && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => router.push('/admin')}>
+              後台管理
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="text-red-600 focus:text-red-600 focus:bg-red-100"
