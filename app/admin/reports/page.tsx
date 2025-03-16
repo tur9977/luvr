@@ -1,7 +1,7 @@
 import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 import { ReportList } from "@/app/admin/components/ReportList"
-import type { Report } from "@/app/admin/components/ReportList"
+import type { Report } from "@/lib/types/profiles"
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0

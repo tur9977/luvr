@@ -31,7 +31,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, Shield, Ban, UserX } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
-import type { Profile, Post, Comment, AdminRole } from "@/lib/types/database.types"
+import type { Profile, Post, Comment, AdminRole } from "@/lib/types/profiles"
 
 interface ExtendedProfile extends Profile {
   is_banned?: boolean

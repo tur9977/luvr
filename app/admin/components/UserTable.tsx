@@ -22,13 +22,8 @@ import { MoreHorizontal } from "lucide-react"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
 import { zhTW } from "date-fns/locale"
+import type { Profile } from "@/lib/types/profiles"
 import type { Database } from "@/lib/types/database.types"
-
-type Profile = Database['public']['Tables']['profiles']['Row'] & {
-  posts: { count: number } | null
-  reports: { count: number } | null
-  role: 'admin' | 'user'
-}
 
 interface UserTableProps {
   users: Profile[]

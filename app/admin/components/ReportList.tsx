@@ -9,33 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { formatDistanceToNow } from "date-fns"
 import { zhTW } from "date-fns/locale"
 import { toast } from "sonner"
-
-export type Report = {
-  id: string
-  reporter_id: string
-  reported_content_id: string
-  reported_user_id: string
-  reason: string
-  status: 'pending' | 'approved' | 'rejected'
-  admin_note: string | null
-  created_at: string
-  resolved_at: string | null
-  resolved_by: string | null
-  posts: {
-    id: string
-    caption: string | null
-    media_url: string | null
-    user_id: string
-    profiles: {
-      username: string
-      avatar_url: string | null
-    }
-  } | null
-  reporter: {
-    username: string
-    avatar_url: string | null
-  } | null
-}
+import type { Report } from "@/lib/types/profiles"
 
 interface ReportListProps {
   reports: Report[]

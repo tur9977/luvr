@@ -1,16 +1,10 @@
 import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 import { UserTable } from "../components/UserTable"
-import type { Database } from "@/lib/types/database.types"
+import type { Profile } from "@/lib/types/profiles"
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
-
-type Profile = Database['public']['Tables']['profiles']['Row'] & {
-  posts: { count: number } | null
-  reports: { count: number } | null
-  role: 'admin' | 'user'
-}
 
 interface UserData {
   id: string
