@@ -10,7 +10,7 @@ import { formatDistanceToNow } from "date-fns"
 import { zhTW } from "date-fns/locale"
 import { toast } from "sonner"
 
-type Report = {
+export type Report = {
   id: string
   reporter_id: string
   reported_content_id: string
