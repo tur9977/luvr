@@ -17,6 +17,7 @@ declare global {
     grecaptcha: {
       ready: (callback: () => void) => void;
       render: (element: HTMLElement | string, options: { sitekey: string; callback: (token: string) => void }) => number;
+      reset: (widgetId?: number) => void;
     };
   }
 }
