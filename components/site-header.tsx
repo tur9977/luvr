@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { PlusCircle } from "lucide-react"
+import { PlusCircle, Calendar } from "lucide-react"
 import { UserNav } from "./user-nav"
 import { useProfile } from "@/hooks/useProfile"
 
@@ -70,6 +70,11 @@ export function SiteHeader() {
             <>
               {profile ? (
                 <>
+                  <Button variant="ghost" size="icon" asChild>
+                    <Link href="/events">
+                      <Calendar className="h-5 w-5" />
+                    </Link>
+                  </Button>
                   <Button variant="ghost" size="icon" asChild>
                     <Link href="/create">
                       <PlusCircle className="h-5 w-5" />

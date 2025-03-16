@@ -32,6 +32,12 @@ export default function CreatePage() {
   const [mediaType, setMediaType] = useState<"image" | "video" | null>(null)
   const [caption, setCaption] = useState("")
   const [location, setLocation] = useState("")
+  const [eventTitle, setEventTitle] = useState("")
+  const [eventDescription, setEventDescription] = useState("")
+  const [eventLocation, setEventLocation] = useState("")
+  const [eventCoverFile, setEventCoverFile] = useState<File | null>(null)
+  const [eventCoverPreview, setEventCoverPreview] = useState<string | null>(null)
+  const [isCreatingEvent, setIsCreatingEvent] = useState(false)
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -132,10 +138,6 @@ export default function CreatePage() {
         fileSize: `${(mediaFile.size / (1024 * 1024)).toFixed(2)}MB`
       })
 
-      // 上傳媒體文件
-      const mediaExt = mediaFile.name.split(".").pop()
-      const mediaPath = `${profile.id}/${Date.now()}.${mediaExt}`
-
       // 檢查文件類型和大小
       const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime']
       if (!allowedTypes.includes(mediaFile.type)) {
@@ -146,7 +148,11 @@ export default function CreatePage() {
         throw new Error(`文件大小超過限制: ${(mediaFile.size / (1024 * 1024)).toFixed(2)}MB`)
       }
 
-      const { error: uploadError, data: uploadData } = await supabase.storage
+      // 上傳媒體文件
+      const mediaExt = mediaFile.name.split(".").pop()
+      const mediaPath = `${profile.id}/${Date.now()}.${mediaExt}`
+
+      const { error: uploadError } = await supabase.storage
         .from("posts")
         .upload(mediaPath, mediaFile, {
           cacheControl: "3600",
@@ -155,26 +161,16 @@ export default function CreatePage() {
         })
 
       if (uploadError) {
-        console.error("媒體文件上傳錯誤:", {
-          error: uploadError,
-          message: uploadError.message,
-          statusCode: uploadError.statusCode,
-          name: uploadError.name,
-          details: uploadError.details
-        })
-        throw uploadError
+        console.error("媒體文件上傳錯誤:", uploadError.message)
+        throw new Error("媒體文件上傳失敗")
       }
-
-      console.log("媒體文件上傳成功:", uploadData)
 
       // 獲取媒體 URL
       const { data: { publicUrl: mediaUrl } } = supabase.storage
         .from("posts")
         .getPublicUrl(mediaPath)
 
-      console.log("獲取到媒體 URL:", mediaUrl)
-
-      // 如果是視頻，生成縮圖
+      // 創建縮略圖（如果是視頻）
       let thumbnailUrl = null
       if (mediaType === "video") {
         console.log("開始生成視頻縮圖...")
@@ -227,7 +223,6 @@ export default function CreatePage() {
             console.error("縮圖上傳錯誤:", {
               error: thumbError,
               message: thumbError.message,
-              statusCode: thumbError.statusCode
             })
             throw thumbError
           }
@@ -248,50 +243,22 @@ export default function CreatePage() {
         }
       }
 
-      // 獲取媒體寬高比和時長
-      console.log("開始計算媒體屬性...")
-      const aspectRatio = mediaType === "video" 
-        ? await getVideoAspectRatio(mediaFile)
-        : await getImageAspectRatio(mediaFile)
-      
-      const duration = mediaType === "video" 
-        ? await getVideoDuration(mediaFile) 
-        : null
-
-      console.log("媒體屬性:", { aspectRatio, duration })
-
       // 創建貼文
-      console.log("開始創建貼文...")
-      const now = new Date().toISOString()
-      const { error: insertError, data: post } = await supabase
+      const { error: insertError } = await supabase
         .from("posts")
         .insert({
-          user_id: profile.id,
           media_url: mediaUrl,
           media_type: mediaType,
-          thumbnail_url: thumbnailUrl,
-          aspect_ratio: aspectRatio,
-          duration,
           caption,
           location,
-          created_at: now,
+          thumbnail_url: thumbnailUrl,
+          user_id: profile.id,
         })
-        .select(`
-          *,
-          profiles!fk_posts_profiles (
-            id,
-            username,
-            avatar_url
-          )
-        `)
-        .single()
 
       if (insertError) {
-        console.error("貼文創建錯誤:", insertError)
-        throw insertError
+        console.error("貼文創建錯誤:", insertError.message)
+        throw new Error("貼文創建失敗")
       }
-
-      console.log("貼文創建成功:", post)
 
       toast({
         title: "發布成功",
@@ -320,6 +287,173 @@ export default function CreatePage() {
     setMediaPreview(null)
     setMediaType(null)
   }, [mediaPreview])
+
+  const handleEventCoverSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // 檢查文件類型
+    const isImage = file.type.startsWith("image/")
+    if (!isImage) {
+      toast({
+        variant: "destructive",
+        title: "不支援的文件類型",
+        description: "請上傳圖片文件",
+      })
+      return
+    }
+
+    // 檢查文件大小（10MB 限制）
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        variant: "destructive",
+        title: "文件太大",
+        description: "請上傳小於 10MB 的圖片",
+      })
+      return
+    }
+
+    setEventCoverFile(file)
+    const previewUrl = URL.createObjectURL(file)
+    setEventCoverPreview(previewUrl)
+
+    return () => {
+      URL.revokeObjectURL(previewUrl)
+    }
+  }, [toast])
+
+  const handleEventCoverDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    const file = e.dataTransfer.files[0]
+    if (!file) return
+
+    const isImage = file.type.startsWith("image/")
+    if (!isImage) {
+      toast({
+        variant: "destructive",
+        title: "不支援的文件類型",
+        description: "請上傳圖片文件",
+      })
+      return
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        variant: "destructive",
+        title: "文件太大",
+        description: "請上傳小於 10MB 的圖片",
+      })
+      return
+    }
+
+    setEventCoverFile(file)
+    const previewUrl = URL.createObjectURL(file)
+    setEventCoverPreview(previewUrl)
+  }, [toast])
+
+  const clearEventCover = useCallback(() => {
+    if (eventCoverPreview) {
+      URL.revokeObjectURL(eventCoverPreview)
+    }
+    setEventCoverFile(null)
+    setEventCoverPreview(null)
+  }, [eventCoverPreview])
+
+  const handleCreateEvent = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!profile) {
+      toast({
+        variant: "destructive",
+        title: "請先登入",
+        description: "您需要登入才能創建活動",
+      })
+      return
+    }
+
+    if (!eventTitle || !date || !eventDescription || !eventLocation) {
+      toast({
+        variant: "destructive",
+        title: "請填寫完整資訊",
+        description: "活動名稱、日期、說明和地點為必填項目",
+      })
+      return
+    }
+
+    try {
+      setIsCreatingEvent(true)
+
+      let coverUrl = null
+      if (eventCoverFile) {
+        // 上傳封面圖片
+        const fileExt = eventCoverFile.name.split(".").pop()
+        const filePath = `events/${profile.id}/${Date.now()}.${fileExt}`
+
+        const { error: uploadError } = await supabase.storage
+          .from("posts")
+          .upload(filePath, eventCoverFile, {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: eventCoverFile.type
+          })
+
+        if (uploadError) {
+          console.error("封面圖片上傳錯誤:", uploadError.message)
+          throw new Error("封面圖片上傳失敗")
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from("posts")
+          .getPublicUrl(filePath)
+
+        coverUrl = publicUrl
+      }
+
+      // 創建活動
+      const { data: eventData, error: insertError } = await supabase
+        .from("events")
+        .insert({
+          title: eventTitle,
+          description: eventDescription,
+          date: date?.toISOString(),
+          location: eventLocation,
+          cover_url: coverUrl,
+          user_id: profile.id,
+        })
+        .select()
+        .single()
+
+      if (insertError) {
+        console.error("活動創建錯誤:", insertError.message)
+        throw new Error("活動創建失敗")
+      }
+
+      toast({
+        title: "創建成功",
+        description: "活動已成功創建",
+      })
+
+      // 重置表單
+      setEventTitle("")
+      setEventDescription("")
+      setDate(undefined)
+      setEventLocation("")
+      setEventCoverFile(null)
+      setEventCoverPreview(null)
+
+      // 導航到新創建的活動頁面
+      router.push(`/events/${eventData.id}`)
+      router.refresh()
+    } catch (error) {
+      console.error("完整錯誤詳情:", error)
+      toast({
+        variant: "destructive",
+        title: "創建失敗",
+        description: error instanceof Error ? error.message : "創建過程中發生錯誤，請稍後再試",
+      })
+    } finally {
+      setIsCreatingEvent(false)
+    }
+  }
 
   return (
     <main className="container max-w-2xl mx-auto p-4 pt-8">
@@ -426,52 +560,114 @@ export default function CreatePage() {
               <CardTitle>建立活動</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="event-title">活動名稱</Label>
-                <Input id="event-title" placeholder="輸入活動名稱" />
-              </div>
-              <div className="space-y-2">
-                <Label>活動日期</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn("w-full justify-start text-left font-normal", !date && "text-muted-foreground")}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {date ? format(date, "PPP", { locale: zhTW }) : "選擇日期"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="space-y-2">
-                <Label>活動封面</Label>
-                <div className="flex items-center justify-center w-full h-48 border-2 border-dashed rounded-lg bg-muted/50">
-                  {isUploading ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <Loader2 className="h-8 w-8 animate-spin" />
-                      <p className="text-sm text-muted-foreground">上傳中...</p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">點擊或拖曳圖片至此處</p>
-                    </div>
-                  )}
+              <form onSubmit={handleCreateEvent} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="event-title">活動名稱</Label>
+                  <Input
+                    id="event-title"
+                    placeholder="輸入活動名稱"
+                    value={eventTitle}
+                    onChange={(e) => setEventTitle(e.target.value)}
+                  />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="event-description">活動說明</Label>
-                <Textarea id="event-description" placeholder="描述活動內容..." className="min-h-[100px]" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="event-location">活動地點</Label>
-                <Input id="event-location" placeholder="輸入活動地點" />
-              </div>
-              <Button className="w-full">建立活動</Button>
+                <div className="space-y-2">
+                  <Label>活動日期</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !date && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {date ? format(date, "PPP", { locale: zhTW }) : "選擇日期"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={date}
+                        onSelect={setDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="space-y-2">
+                  <Label>活動封面</Label>
+                  <div
+                    className="flex items-center justify-center w-full h-48 border-2 border-dashed rounded-lg bg-muted/50"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={handleEventCoverDrop}
+                  >
+                    {isCreatingEvent ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                        <p className="text-sm text-muted-foreground">上傳中...</p>
+                      </div>
+                    ) : eventCoverPreview ? (
+                      <div className="relative w-full h-full">
+                        <Image
+                          src={eventCoverPreview}
+                          alt="Event cover preview"
+                          fill
+                          className="object-cover rounded-lg"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2"
+                          onClick={clearEventCover}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center gap-2 cursor-pointer">
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={handleEventCoverSelect}
+                        />
+                        <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">
+                          點擊或拖曳圖片至此處
+                        </p>
+                      </label>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="event-description">活動說明</Label>
+                  <Textarea
+                    id="event-description"
+                    placeholder="描述活動內容..."
+                    className="min-h-[100px]"
+                    value={eventDescription}
+                    onChange={(e) => setEventDescription(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="event-location">活動地點</Label>
+                  <Input
+                    id="event-location"
+                    placeholder="輸入活動地點"
+                    value={eventLocation}
+                    onChange={(e) => setEventLocation(e.target.value)}
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={isCreatingEvent}
+                >
+                  {isCreatingEvent ? "創建中..." : "建立活動"}
+                </Button>
+              </form>
             </CardContent>
           </Card>
         </TabsContent>
