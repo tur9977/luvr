@@ -25,7 +25,8 @@ async function getUsers() {
   console.log('Users fetched:', users?.length || 0)
   return users.map(user => ({
     ...user,
-    posts: { count: user.post_count }
+    posts: { count: user.post_count },
+    reports: { count: user.report_count }
   })) || []
 }
 

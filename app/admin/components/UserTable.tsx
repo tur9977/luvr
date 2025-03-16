@@ -27,6 +27,7 @@ import type { Database } from "@/lib/types/database.types"
 type Profile = Database['public']['Tables']['profiles']['Row'] & {
   posts: { count: number } | null
   reports: { count: number } | null
+  role: 'admin' | 'user'
 }
 
 interface UserTableProps {
