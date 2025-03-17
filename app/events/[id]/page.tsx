@@ -75,6 +75,33 @@ type Photo = {
   }
 }
 
+// 添加 Supabase 返回的原始照片类型
+type PhotoFromSupabase = {
+  id: string
+  event_id: string
+  user_id: string
+  photo_url: string
+  caption: string | null
+  created_at: string
+  updated_at: string
+}
+
+// 添加 Supabase 返回的原始事件类型
+type EventFromSupabase = Omit<Database["public"]["Tables"]["events"]["Row"], "profiles"> & {
+  profiles?: Array<{
+    username: string | null
+    avatar_url: string | null
+  }> | null
+  participants?: Array<{
+    status: string
+    user_id: string
+    profiles?: Array<{
+      username: string | null
+      avatar_url: string | null
+    }> | null
+  }> | null
+}
+
 export default function EventPage() {
   const params = useParams()
   const router = useRouter()
@@ -132,6 +159,24 @@ export default function EventPage() {
         console.error("Error fetching participants:", participantsError)
       }
 
+      // 处理 eventData.profiles 为数组的情况
+      const eventProfiles = eventData.profiles && Array.isArray(eventData.profiles) 
+        ? eventData.profiles[0] || { username: null, avatar_url: null }
+        : eventData.profiles || { username: null, avatar_url: null };
+      
+      // 处理参与者的 profiles 数组
+      const transformedParticipants = (participants || []).map(participant => {
+        const participantProfiles = participant.profiles && Array.isArray(participant.profiles)
+          ? participant.profiles[0] || { username: null, avatar_url: null }
+          : participant.profiles || { username: null, avatar_url: null };
+          
+        return {
+          status: participant.status,
+          user_id: participant.user_id,
+          profiles: participantProfiles
+        };
+      });
+
       // 獲取活動評論
       const { data: commentsData, error: commentsError } = await supabase
         .from("event_comments")
@@ -180,12 +225,7 @@ export default function EventPage() {
           photo_url,
           caption,
           created_at,
-          updated_at,
-          profiles:user_id (
-            avatar_url,
-            full_name,
-            username
-          )
+          updated_at
         `)
         .eq("event_id", id)
         .order("created_at", { ascending: false })
@@ -194,12 +234,44 @@ export default function EventPage() {
         console.error("Error fetching photos:", photosError)
       }
 
+      // 获取照片上传者的个人资料
+      const photoUserIds = (photosData || []).map(photo => photo.user_id)
+      let photoProfilesData = null
+      if (photoUserIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from("profiles")
+          .select("id, avatar_url, full_name, username")
+          .in("id", photoUserIds)
+        
+        photoProfilesData = profilesData
+      }
+
+      // 转换照片数据，确保 profiles 字段格式正确
+      const transformedPhotos = (photosData || []).map((photo: PhotoFromSupabase) => {
+        const profile = photoProfilesData?.find(p => p.id === photo.user_id)
+        
+        return {
+          id: photo.id,
+          event_id: photo.event_id,
+          user_id: photo.user_id,
+          photo_url: photo.photo_url,
+          caption: photo.caption,
+          created_at: photo.created_at,
+          updated_at: photo.updated_at,
+          profiles: {
+            avatar_url: profile?.avatar_url || null,
+            full_name: profile?.full_name || null,
+            username: profile?.username || null
+          }
+        } as Photo;
+      })
+
       setEvent({
         ...eventData,
-        participants: participants || []
+        participants: transformedParticipants
       })
       setComments(transformedComments)
-      setPhotos(photosData || [])
+      setPhotos(transformedPhotos)
     } catch (error) {
       console.error("Error fetching event:", error)
       toast({
@@ -478,25 +550,39 @@ export default function EventPage() {
             </div>
           )}
 
-          <div className="flex items-center gap-4 mt-4">
+          <div className="flex flex-wrap items-center gap-3 mt-4">
             {!isOwner && (
-              <Button
-                onClick={() => handleParticipate("going")}
-                disabled={loading}
-                className={cn(
-                  "bg-[#8A6FD4] hover:bg-[#7857C8]",
-                  participating && "bg-green-600 hover:bg-green-700"
-                )}
-              >
-                {participating ? "已報名參加" : "我要參加"}
-              </Button>
+              <>
+                <Button
+                  onClick={() => handleParticipate("going")}
+                  disabled={participating}
+                  className={cn(
+                    "bg-[#8A6FD4] hover:bg-[#7857C8]",
+                    currentStatus === "going" && "bg-green-600 hover:bg-green-700"
+                  )}
+                >
+                  {currentStatus === "going" ? "已報名參加" : "我要參加"}
+                </Button>
+                <Button
+                  onClick={() => handleParticipate("interested")}
+                  disabled={participating}
+                  variant="outline"
+                  className={cn(
+                    currentStatus === "interested" && "bg-blue-100 border-blue-300"
+                  )}
+                >
+                  {currentStatus === "interested" ? "已感興趣" : "我感興趣"}
+                </Button>
+              </>
             )}
-            <EventCalendarSync
-              eventTitle={event.title}
-              eventDate={event.date}
-              eventLocation={event.location}
-              eventDescription={event.description}
-            />
+            <div className="ml-auto">
+              <EventCalendarSync
+                eventTitle={event.title}
+                eventDate={event.date}
+                eventLocation={event.location}
+                eventDescription={event.description}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -593,12 +679,12 @@ export default function EventPage() {
 
       <div className="space-y-2">
         <h2 className="text-2xl font-bold tracking-tight">活動相片</h2>
-        <EventPhotos eventId={id} photos={photos} />
+        {id && <EventPhotos eventId={id} photos={photos} />}
       </div>
 
       <div className="space-y-2">
         <h2 className="text-2xl font-bold tracking-tight">活動評論</h2>
-        <EventComments eventId={id} comments={comments} />
+        {id && <EventComments eventId={id} comments={comments} />}
       </div>
     </main>
   )

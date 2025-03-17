@@ -461,6 +461,7 @@ export interface Database {
           user_id: string
           created_at: string
           updated_at: string
+          event_type: string
         }
         Insert: {
           id?: string
@@ -472,6 +473,7 @@ export interface Database {
           user_id: string
           created_at?: string
           updated_at?: string
+          event_type?: string
         }
         Update: {
           id?: string
@@ -483,6 +485,7 @@ export interface Database {
           user_id?: string
           created_at?: string
           updated_at?: string
+          event_type?: string
         }
         Relationships: [
           {

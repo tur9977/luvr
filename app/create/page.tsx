@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { CalendarIcon, ImageIcon, Loader2, VideoIcon, X } from "lucide-react"
+import { CalendarIcon, ImageIcon, ImagePlus, Loader2, Tag, VideoIcon, X } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
@@ -19,6 +19,13 @@ import { useRouter } from "next/navigation"
 import { useProfile } from '@/hooks/useProfile'
 import Image from "next/image"
 import { useUser } from "@/hooks/useUser"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export default function CreatePage() {
   const { toast } = useToast()
@@ -37,6 +44,7 @@ export default function CreatePage() {
   const [eventLocation, setEventLocation] = useState("")
   const [eventCoverFile, setEventCoverFile] = useState<File | null>(null)
   const [eventCoverPreview, setEventCoverPreview] = useState<string | null>(null)
+  const [eventType, setEventType] = useState("social")
   const [isCreatingEvent, setIsCreatingEvent] = useState(false)
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -418,6 +426,7 @@ export default function CreatePage() {
           location: eventLocation,
           cover_url: coverUrl,
           user_id: profile.id,
+          event_type: eventType,
         })
         .select()
         .single()
@@ -439,6 +448,7 @@ export default function CreatePage() {
       setEventLocation("")
       setEventCoverFile(null)
       setEventCoverPreview(null)
+      setEventType("social")
 
       // 導航到新創建的活動頁面
       router.push(`/events/${eventData.id}`)
@@ -454,6 +464,16 @@ export default function CreatePage() {
       setIsCreatingEvent(false)
     }
   }
+
+  // EVENT_TYPES 常量（與篩選組件中保持一致，但不包含 'all' 選項）
+  const EVENT_TYPES = [
+    { value: "social", label: "社交聚會" },
+    { value: "sports", label: "運動活動" },
+    { value: "education", label: "教育講座" },
+    { value: "entertainment", label: "娛樂表演" },
+    { value: "business", label: "商業交流" },
+    { value: "other", label: "其他" },
+  ]
 
   return (
     <main className="container max-w-2xl mx-auto p-4 pt-8">
@@ -569,6 +589,27 @@ export default function CreatePage() {
                     value={eventTitle}
                     onChange={(e) => setEventTitle(e.target.value)}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label>活動類型</Label>
+                  <Select
+                    value={eventType}
+                    onValueChange={setEventType}
+                  >
+                    <SelectTrigger>
+                      <div className="flex items-center">
+                        <Tag className="mr-2 h-4 w-4 text-muted-foreground" />
+                        <SelectValue placeholder="活動類型" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EVENT_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>活動日期</Label>

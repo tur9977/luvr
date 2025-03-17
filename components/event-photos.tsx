@@ -38,6 +38,17 @@ type Photo = {
   }
 }
 
+// 添加 Supabase 返回的照片类型
+type PhotoFromSupabase = {
+  id: string
+  event_id: string
+  user_id: string
+  photo_url: string
+  caption: string | null
+  created_at: string
+  updated_at: string
+}
+
 interface EventPhotosProps {
   eventId: string
   photos: Photo[]
@@ -53,6 +64,7 @@ export function EventPhotos({ eventId, photos: initialPhotos }: EventPhotosProps
   const [uploadDialog, setUploadDialog] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [caption, setCaption] = useState("")
+  const [isDragging, setIsDragging] = useState(false)
   const { profile } = useProfile()
   const supabase = createClient()
 
@@ -80,6 +92,59 @@ export function EventPhotos({ eventId, photos: initialPhotos }: EventPhotosProps
     reader.readAsDataURL(file)
   }
 
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    
+    const file = e.dataTransfer.files?.[0]
+    if (!file) return
+
+    // 檢查文件大小
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("檔案大小不能超過 5MB")
+      return
+    }
+
+    // 檢查文件類型
+    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+      toast.error("只支援 JPG、PNG 和 WebP 格式的圖片")
+      return
+    }
+
+    // 創建預覽
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setPreviewUrl(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+    
+    // 将拖放的文件设置到文件输入框
+    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]')
+    if (fileInput) {
+      const dataTransfer = new DataTransfer()
+      dataTransfer.items.add(file)
+      fileInput.files = dataTransfer.files
+    }
+  }
+
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!profile) {
@@ -87,7 +152,7 @@ export function EventPhotos({ eventId, photos: initialPhotos }: EventPhotosProps
       return
     }
 
-    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]')
+    const fileInput = document.querySelector<HTMLInputElement>('#photo')
     const file = fileInput?.files?.[0]
     if (!file) {
       toast.error("請選擇要上傳的照片")
@@ -98,18 +163,29 @@ export function EventPhotos({ eventId, photos: initialPhotos }: EventPhotosProps
     try {
       // 上傳照片到 Storage
       const fileExt = file.name.split(".").pop()
-      const filePath = `event-photos/${eventId}/${Math.random()}.${fileExt}`
+      const fileName = `${Math.random().toString(36).substring(2, 15)}_${Math.random().toString(36).substring(2, 15)}.${fileExt}`
+      const filePath = `event-photos/${eventId}/${fileName}`
+
+      console.log('Uploading file:', file)
+      console.log('File path:', filePath)
 
       const { error: uploadError, data: uploadData } = await supabase.storage
         .from("photos")
         .upload(filePath, file)
 
-      if (uploadError) throw uploadError
+      if (uploadError) {
+        console.error('Upload error:', uploadError)
+        throw uploadError
+      }
+
+      console.log('Upload successful:', uploadData)
 
       // 獲取照片的公開 URL
       const { data: { publicUrl } } = supabase.storage
         .from("photos")
         .getPublicUrl(filePath)
+
+      console.log('Public URL:', publicUrl)
 
       // 將照片信息保存到數據庫
       const { data: photoData, error: insertError } = await supabase
@@ -127,18 +203,45 @@ export function EventPhotos({ eventId, photos: initialPhotos }: EventPhotosProps
           photo_url,
           caption,
           created_at,
-          updated_at,
-          profiles:user_id (
-            avatar_url,
-            full_name,
-            username
-          )
+          updated_at
         `)
         .single()
 
-      if (insertError) throw insertError
+      if (insertError) {
+        console.error('Insert error:', insertError)
+        throw insertError
+      }
 
-      setPhotos((prev) => [photoData, ...prev])
+      console.log('Insert successful:', photoData)
+
+      // 获取用户资料
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("avatar_url, full_name, username")
+        .eq("id", profile.id)
+        .single()
+
+      if (profileError) {
+        console.error('Profile fetch error:', profileError)
+      }
+
+      // 转换照片数据，确保 profiles 字段格式正确
+      const transformedPhoto: Photo = {
+        id: photoData.id,
+        event_id: photoData.event_id,
+        user_id: photoData.user_id,
+        photo_url: photoData.photo_url,
+        caption: photoData.caption,
+        created_at: photoData.created_at,
+        updated_at: photoData.updated_at,
+        profiles: {
+          avatar_url: profileData?.avatar_url || null,
+          full_name: profileData?.full_name || null,
+          username: profileData?.username || null
+        }
+      };
+
+      setPhotos((prev) => [transformedPhoto, ...prev])
       setUploadDialog(false)
       setPreviewUrl(null)
       setCaption("")
@@ -154,12 +257,13 @@ export function EventPhotos({ eventId, photos: initialPhotos }: EventPhotosProps
   const handleDelete = async (photoId: string, photoUrl: string) => {
     try {
       // 從 Storage 中刪除照片
-      const filePath = photoUrl.split("/").pop()
-      if (filePath) {
-        await supabase.storage
-          .from("photos")
-          .remove([`event-photos/${eventId}/${filePath}`])
-      }
+      const urlParts = photoUrl.split("/");
+      const fileName = urlParts[urlParts.length - 1];
+      const filePath = `event-photos/${eventId}/${fileName}`;
+
+      await supabase.storage
+        .from("photos")
+        .remove([filePath]);
 
       // 從數據庫中刪除記錄
       const { error } = await supabase
@@ -202,13 +306,19 @@ export function EventPhotos({ eventId, photos: initialPhotos }: EventPhotosProps
             <form onSubmit={handleUpload} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="photo">照片</Label>
-                <div className="relative aspect-video rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-muted-foreground/50 transition-colors">
+                <div 
+                  className={`relative aspect-video rounded-lg border-2 border-dashed ${isDragging ? 'border-primary' : 'border-muted-foreground/25 hover:border-muted-foreground/50'} transition-colors`}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                >
                   <input
                     id="photo"
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     onChange={handleFileSelect}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50"
                   />
                   {previewUrl ? (
                     <div className="relative aspect-video">
@@ -222,14 +332,14 @@ export function EventPhotos({ eventId, photos: initialPhotos }: EventPhotosProps
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="absolute top-2 right-2"
+                        className="absolute top-2 right-2 z-50"
                         onClick={() => setPreviewUrl(null)}
                       >
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
                   ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground pointer-events-none">
                       <ImagePlus className="h-8 w-8" />
                       <span>點擊或拖曳照片至此</span>
                     </div>
