@@ -16,14 +16,20 @@ declare global {
   interface Window {
     grecaptcha: {
       ready: (callback: () => void) => void;
-      render: (element: HTMLElement | string, options: { sitekey: string; callback: (token: string) => void }) => number;
+      render: (element: HTMLElement | string, options: { 
+        sitekey: string; 
+        callback: (token: string) => void;
+        'expired-callback'?: () => void;
+      }) => number;
       reset: (widgetId?: number) => void;
+      execute: (sitekey: string, options: { action: string }) => Promise<string>;
     };
+    onRecaptchaLoad: () => void;
   }
 }
 
 // 使用環境變量中的 site key
-const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!
+const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "6LfbZFEpAAAAAEqvNAei0FkY2kDLaVt8bCD0R_c3"
 
 export default function AuthPage() {
   const router = useRouter()
@@ -41,24 +47,45 @@ export default function AuthPage() {
     username: "",
   })
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null)
+  const [recaptchaWidgetId, setRecaptchaWidgetId] = useState<number | null>(null);
 
+  // 定义全局回调函数
   useEffect(() => {
-    // 當 window.grecaptcha 可用時初始化
-    if (window.grecaptcha) {
-      window.grecaptcha.ready(() => {
-        try {
-          window.grecaptcha.render('recaptcha-container', {
+    // 为reCAPTCHA API定义全局回调
+    window.onRecaptchaLoad = () => {
+      try {
+        console.log("reCAPTCHA API loaded");
+        if (window.grecaptcha && document.getElementById('recaptcha-container')) {
+          const widgetId = window.grecaptcha.render('recaptcha-container', {
             sitekey: RECAPTCHA_SITE_KEY,
             callback: (token: string) => {
-              setRecaptchaToken(token)
+              console.log("reCAPTCHA verified");
+              setRecaptchaToken(token);
+            },
+            'expired-callback': () => {
+              console.log("reCAPTCHA expired");
+              setRecaptchaToken(null);
             }
-          })
-        } catch (error) {
-          console.error('reCAPTCHA initialization error:', error)
+          });
+          setRecaptchaWidgetId(widgetId);
         }
-      })
+      } catch (error) {
+        console.error('reCAPTCHA initialization error:', error);
+      }
+    };
+
+    // 如果API已加载，则直接初始化
+    if (window.grecaptcha && window.grecaptcha.ready) {
+      window.grecaptcha.ready(() => {
+        window.onRecaptchaLoad();
+      });
     }
-  }, [])
+
+    return () => {
+      // 清理函数
+      window.onRecaptchaLoad = () => {};
+    };
+  }, []);
 
   // 處理登入
   const handleLogin = async (e: React.FormEvent) => {
@@ -195,8 +222,8 @@ export default function AuthPage() {
   return (
     <>
       <Script
-        src="https://www.google.com/recaptcha/api.js"
-        strategy="beforeInteractive"
+        src={`https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit`}
+        strategy="afterInteractive"
       />
       <main className="container max-w-md mx-auto p-4 pt-8">
         <Tabs defaultValue={searchParams.get("tab") || "login"} className="w-full">
@@ -315,9 +342,9 @@ export default function AuthPage() {
                     <p className="text-xs text-muted-foreground mt-1">密碼至少需要 6 個字元</p>
                   </div>
                   <div className="space-y-2">
-                    <div id="recaptcha-container" className="flex justify-center"></div>
+                    <div id="recaptcha-container" className="flex justify-center mb-2"></div>
                     {!recaptchaToken && (
-                      <p className="text-sm text-red-500">請完成驗證碼驗證</p>
+                      <p className="text-sm text-red-500 text-center">請完成驗證碼驗證</p>
                     )}
                   </div>
                   <Button 
