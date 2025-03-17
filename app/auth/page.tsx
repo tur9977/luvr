@@ -29,7 +29,7 @@ declare global {
 }
 
 // 使用環境變量中的 site key
-const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "6LfbZFEpAAAAAEqvNAei0FkY2kDLaVt8bCD0R_c3"
+const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "6LfXPfcqAAAAAM1V7rr_Nrt3nvSc89jkbIOTuuLJ"
 
 export default function AuthPage() {
   const router = useRouter()
@@ -46,46 +46,92 @@ export default function AuthPage() {
     password: "",
     username: "",
   })
+  const [resetData, setResetData] = useState({
+    email: "",
+  })
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null)
   const [recaptchaWidgetId, setRecaptchaWidgetId] = useState<number | null>(null);
+  const [recaptchaError, setRecaptchaError] = useState<string | null>(null);
 
   // 定义全局回调函数
   useEffect(() => {
+    console.log("Auth page mounted, initializing reCAPTCHA with site key:", RECAPTCHA_SITE_KEY);
+    
     // 为reCAPTCHA API定义全局回调
     window.onRecaptchaLoad = () => {
       try {
-        console.log("reCAPTCHA API loaded");
-        if (window.grecaptcha && document.getElementById('recaptcha-container')) {
+        console.log("reCAPTCHA API loaded successfully");
+        const recaptchaContainer = document.getElementById('recaptcha-container');
+        
+        if (!recaptchaContainer) {
+          const errorMsg = "Failed to find recaptcha-container element";
+          console.error(errorMsg);
+          setRecaptchaError(errorMsg);
+          return;
+        }
+        
+        if (!window.grecaptcha) {
+          const errorMsg = "grecaptcha is not available";
+          console.error(errorMsg);
+          setRecaptchaError(errorMsg);
+          return;
+        }
+        
+        try {
           const widgetId = window.grecaptcha.render('recaptcha-container', {
             sitekey: RECAPTCHA_SITE_KEY,
             callback: (token: string) => {
-              console.log("reCAPTCHA verified");
+              console.log("reCAPTCHA verified with token:", token.substring(0, 10) + "...");
               setRecaptchaToken(token);
+              setRecaptchaError(null);
             },
             'expired-callback': () => {
               console.log("reCAPTCHA expired");
               setRecaptchaToken(null);
+              setRecaptchaError("驗證已過期，請重新驗證");
             }
           });
+          console.log("reCAPTCHA widget rendered with ID:", widgetId);
           setRecaptchaWidgetId(widgetId);
+        } catch (renderError: unknown) {
+          console.error('reCAPTCHA render error:', renderError);
+          setRecaptchaError(`渲染錯誤: ${renderError instanceof Error ? renderError.message : "未知錯誤"}`);
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('reCAPTCHA initialization error:', error);
+        setRecaptchaError(`初始化錯誤: ${error instanceof Error ? error.message : "未知錯誤"}`);
       }
     };
 
-    // 如果API已加载，则直接初始化
-    if (window.grecaptcha && window.grecaptcha.ready) {
-      window.grecaptcha.ready(() => {
-        window.onRecaptchaLoad();
-      });
-    }
-
+    // 检查grecaptcha是否已加载
+    const checkAndInitRecaptcha = () => {
+      if (window.grecaptcha && window.grecaptcha.ready) {
+        console.log("grecaptcha is ready, calling onRecaptchaLoad");
+        window.grecaptcha.ready(() => {
+          window.onRecaptchaLoad();
+        });
+      } else {
+        console.log("grecaptcha not ready yet, will rely on onload callback");
+      }
+    };
+    
+    // 首次尝试初始化
+    checkAndInitRecaptcha();
+    
+    // 清理函数
     return () => {
-      // 清理函数
-      window.onRecaptchaLoad = () => {};
+      window.onRecaptchaLoad = () => {
+        console.log("Cleaned up onRecaptchaLoad callback");
+      };
     };
   }, []);
+
+  // 檢查是否是從驗證郵件跳轉回來的
+  useEffect(() => {
+    if (searchParams.get("confirmed") === "true") {
+      toast.success("您的帳號已成功驗證！現在可以登入了。", { duration: 6000 });
+    }
+  }, [searchParams]);
 
   // 處理登入
   const handleLogin = async (e: React.FormEvent) => {
@@ -219,17 +265,48 @@ export default function AuthPage() {
     }
   }
 
+  // 處理忘記密碼
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetData.email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      })
+
+      if (error) throw error
+
+      toast.success(
+        "密碼重設連結已發送到您的電子郵件。請檢查您的信箱。",
+        { duration: 6000 }
+      )
+      router.push("/auth?tab=login")
+    } catch (error) {
+      console.error("Reset password error:", error)
+      toast.error("密碼重設郵件發送失敗：" + (error as Error).message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <>
       <Script
         src={`https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit`}
         strategy="afterInteractive"
+        onLoad={() => console.log("reCAPTCHA script loaded")}
+        onError={(e) => {
+          console.error("reCAPTCHA script failed to load", e);
+          setRecaptchaError("驗證碼腳本加載失敗");
+        }}
       />
       <main className="container max-w-md mx-auto p-4 pt-8">
         <Tabs defaultValue={searchParams.get("tab") || "login"} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="login">登入</TabsTrigger>
             <TabsTrigger value="register">註冊</TabsTrigger>
+            <TabsTrigger value="reset">忘記密碼</TabsTrigger>
           </TabsList>
 
           <TabsContent value="login">
@@ -284,6 +361,15 @@ export default function AuthPage() {
                     )}
                   </Button>
                 </form>
+                <div className="text-center mt-4">
+                  <Button 
+                    variant="link" 
+                    className="p-0 h-auto text-sm text-muted-foreground"
+                    onClick={() => router.push("/auth?tab=reset")}
+                  >
+                    忘記密碼？
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -344,7 +430,12 @@ export default function AuthPage() {
                   <div className="space-y-2">
                     <div id="recaptcha-container" className="flex justify-center mb-2"></div>
                     {!recaptchaToken && (
-                      <p className="text-sm text-red-500 text-center">請完成驗證碼驗證</p>
+                      <p className="text-sm text-red-500 text-center">
+                        {recaptchaError || "請完成驗證碼驗證"}
+                      </p>
+                    )}
+                    {recaptchaToken && (
+                      <p className="text-sm text-green-500 text-center">驗證碼已通過</p>
                     )}
                   </div>
                   <Button 
@@ -363,6 +454,45 @@ export default function AuthPage() {
                     )}
                   </Button>
                 </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="reset">
+            <Card>
+              <CardHeader>
+                <CardTitle>忘記密碼</CardTitle>
+                <CardDescription>輸入您的電子郵件以接收密碼重設連結</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <form onSubmit={handleResetPassword} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-email">電子郵件</Label>
+                    <Input
+                      id="reset-email"
+                      type="email"
+                      placeholder="your@email.com"
+                      value={resetData.email}
+                      onChange={(e) => setResetData({ ...resetData, email: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" variant="purple" className="w-full" disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        處理中...
+                      </>
+                    ) : (
+                      "發送重設連結"
+                    )}
+                  </Button>
+                </form>
+                <div className="text-center mt-4">
+                  <p className="text-sm text-muted-foreground">
+                    已註冊但未驗證的電子郵件也可使用此功能重設密碼
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
