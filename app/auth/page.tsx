@@ -158,8 +158,8 @@ export default function AuthPage() {
       }
 
       toast.success("登入成功！")
-      router.push("/")
-      router.refresh()
+      // 先刷新頁面，再跳轉
+      window.location.href = "/"
     } catch (error) {
       console.error("Login error:", error)
       toast.error("登入失敗：" + (error as Error).message)
@@ -240,7 +240,8 @@ export default function AuthPage() {
           },
         }
       )
-      router.push("/auth?tab=login")
+      // 使用 window.location.href 進行頁面跳轉
+      window.location.href = "/auth?tab=login"
     } catch (error) {
       console.error("Register error:", error)
       if ((error as Error).message.includes("unique constraint")) {

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase/client"
-import type { Profile } from "@/lib/types/database.types"
+import type { Profile } from "@/lib/types/profiles"
 
 export function useProfile() {
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -12,12 +12,33 @@ export function useProfile() {
 
   useEffect(() => {
     fetchProfile()
+
+    // 監聽認證狀態變化
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.id)
+      
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        await fetchProfile()
+      } else if (event === 'SIGNED_OUT') {
+        setProfile(null)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   const fetchProfile = async () => {
     try {
       setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+      if (authError) {
+        console.error('Auth error:', authError)
+        setProfile(null)
+        return
+      }
 
       if (!user) {
         setProfile(null)
@@ -31,12 +52,15 @@ export function useProfile() {
         .single()
 
       if (error) {
-        throw error
+        console.error('Profile error:', error)
+        setProfile(null)
+        return
       }
 
       setProfile(data)
     } catch (error) {
       console.error('Error fetching profile:', error)
+      setProfile(null)
     } finally {
       setLoading(false)
     }
