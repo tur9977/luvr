@@ -172,8 +172,12 @@ export default async function ProfilePage({ params }: Props) {
   return (
     <main className="container max-w-2xl mx-auto p-4">
       <div className="flex flex-col items-center gap-6 py-8">
-        <Avatar className="h-32 w-32">
-          <AvatarImage src={profile.avatar_url || "/placeholder.svg"} />
+        <Avatar className="h-32 w-32 overflow-hidden">
+          <AvatarImage 
+            src={profile.avatar_url || "/placeholder.svg"} 
+            alt={profile.username || "User avatar"}
+            className="object-cover"
+          />
           <AvatarFallback>
             {(profile.username || "U").charAt(0).toUpperCase()}
           </AvatarFallback>

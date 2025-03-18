@@ -12,15 +12,27 @@ export async function GET(request: NextRequest) {
   if (code) {
     const cookieStore = cookies()
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
-    await supabase.auth.exchangeCodeForSession(code)
     
-    // 根據操作類型進行不同的重定向
-    if (type === 'recovery') {
-      // 密碼重設
-      return NextResponse.redirect(new URL('/auth/reset-password', request.url))
-    } else if (type === 'signup') {
-      // 註冊確認成功，導向登入頁
-      return NextResponse.redirect(new URL('/auth?tab=login&confirmed=true', request.url))
+    try {
+      // 交換 code 獲取 session
+      const { error } = await supabase.auth.exchangeCodeForSession(code)
+      
+      if (error) {
+        console.error('Auth callback error:', error)
+        return NextResponse.redirect(new URL('/auth?error=callback_failed', request.url))
+      }
+
+      // 根據操作類型進行不同的重定向
+      if (type === 'recovery') {
+        // 密碼重設
+        return NextResponse.redirect(new URL('/auth/reset-password', request.url))
+      } else if (type === 'signup') {
+        // 註冊確認成功，導向登入頁
+        return NextResponse.redirect(new URL('/auth?tab=login&confirmed=true', request.url))
+      }
+    } catch (error) {
+      console.error('Auth callback error:', error)
+      return NextResponse.redirect(new URL('/auth?error=callback_failed', request.url))
     }
   }
 

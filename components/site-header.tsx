@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { PlusCircle, Calendar } from "lucide-react"
 import { UserNav } from "./user-nav"
 import { useProfile } from "@/hooks/useProfile"
+import { useRouter } from "next/navigation"
 
 // Vibrant and joyful logo design
 const Logo = () => (
@@ -47,6 +48,11 @@ const Logo = () => (
 
 export function SiteHeader() {
   const { profile, loading } = useProfile()
+  const router = useRouter()
+
+  const handleNavigation = (path: string) => {
+    router.push(path)
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -71,24 +77,36 @@ export function SiteHeader() {
               {profile ? (
                 <>
                   <Button variant="ghost" size="icon" asChild>
-                    <Link href="/events">
-                      <Calendar className="h-5 w-5" />
+                    <Link href="/events" aria-label="活動日曆">
+                      <Calendar className="h-5 w-5" aria-hidden="true" />
                     </Link>
                   </Button>
                   <Button variant="ghost" size="icon" asChild>
-                    <Link href="/create">
-                      <PlusCircle className="h-5 w-5" />
+                    <Link href="/create" aria-label="建立新活動">
+                      <PlusCircle className="h-5 w-5" aria-hidden="true" />
                     </Link>
                   </Button>
                   <UserNav />
                 </>
               ) : (
                 <>
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href="/auth">登入</Link>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    asChild
+                  >
+                    <Link href="/auth" aria-label="登入">
+                      登入
+                    </Link>
                   </Button>
-                  <Button size="sm" className="bg-[#8A6FD4] hover:bg-[#7857C8]" asChild>
-                    <Link href="/auth?tab=register">註冊</Link>
+                  <Button 
+                    size="sm" 
+                    className="bg-[#8A6FD4] hover:bg-[#7857C8]"
+                    asChild
+                  >
+                    <Link href="/auth?tab=register" aria-label="註冊">
+                      註冊
+                    </Link>
                   </Button>
                 </>
               )}

@@ -176,7 +176,7 @@ export default function AuthPage() {
         type: 'signup',
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/auth/callback?type=signup`,
         },
       })
       
@@ -210,7 +210,7 @@ export default function AuthPage() {
           data: {
             username: registerData.username,
           },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/auth/callback?type=signup`,
         },
       })
 
@@ -273,7 +273,7 @@ export default function AuthPage() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(resetData.email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
       })
 
       if (error) throw error
@@ -346,15 +346,17 @@ export default function AuthPage() {
                         size="icon"
                         className="absolute right-0 top-0"
                         onClick={() => setShowPassword(!showPassword)}
+                        aria-label={showPassword ? "隱藏密碼" : "顯示密碼"}
+                        title={showPassword ? "隱藏密碼" : "顯示密碼"}
                       >
-                        {showPassword ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                        {showPassword ? <EyeOffIcon className="h-4 w-4" aria-hidden="true" /> : <EyeIcon className="h-4 w-4" aria-hidden="true" />}
                       </Button>
                     </div>
                   </div>
-                  <Button type="submit" variant="purple" className="w-full" disabled={isLoading}>
+                  <Button type="submit" variant="purple" className="w-full" disabled={isLoading} aria-label="登入">
                     {isLoading ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                         登入中...
                       </>
                     ) : (
@@ -367,6 +369,7 @@ export default function AuthPage() {
                     variant="link" 
                     className="p-0 h-auto text-sm text-muted-foreground"
                     onClick={() => router.push("/auth?tab=reset")}
+                    aria-label="忘記密碼"
                   >
                     忘記密碼？
                   </Button>
@@ -422,8 +425,10 @@ export default function AuthPage() {
                         size="icon"
                         className="absolute right-0 top-0"
                         onClick={() => setShowPassword(!showPassword)}
+                        aria-label={showPassword ? "隱藏密碼" : "顯示密碼"}
+                        title={showPassword ? "隱藏密碼" : "顯示密碼"}
                       >
-                        {showPassword ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                        {showPassword ? <EyeOffIcon className="h-4 w-4" aria-hidden="true" /> : <EyeIcon className="h-4 w-4" aria-hidden="true" />}
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">密碼至少需要 6 個字元</p>
@@ -444,10 +449,11 @@ export default function AuthPage() {
                     variant="purple" 
                     className="w-full" 
                     disabled={isLoading || !recaptchaToken}
+                    aria-label="註冊"
                   >
                     {isLoading ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                         註冊中...
                       </>
                     ) : (
@@ -478,10 +484,10 @@ export default function AuthPage() {
                       required
                     />
                   </div>
-                  <Button type="submit" variant="purple" className="w-full" disabled={isLoading}>
+                  <Button type="submit" variant="purple" className="w-full" disabled={isLoading} aria-label="發送重設連結">
                     {isLoading ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                         處理中...
                       </>
                     ) : (

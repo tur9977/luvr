@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>確認您的 LUVR 帳號</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .container {
+      background-color: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      color: #6366f1;
+      margin-bottom: 20px;
+    }
+    .button {
+      display: inline-block;
+      padding: 12px 24px;
+      background-color: #6366f1;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      margin: 20px 0;
+    }
+    .footer {
+      margin-top: 20px;
+      font-size: 12px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>歡迎加入 LUVR</h1>
+    <p>您好，</p>
+    <p>感謝您註冊 LUVR！請點擊下方按鈕確認您的電子郵件地址：</p>
+    
+    <a href="{{ .ConfirmationURL }}" class="button">確認我的帳號</a>
+    
+    <p>如果您沒有註冊 LUVR 帳號，請忽略此郵件。</p>
+    
+    <p>此連結將在 24 小時後過期。</p>
+    
+    <div class="footer">
+      <p>此郵件由系統自動發送，請勿回覆。</p>
+      <p>© LUVR. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html> 

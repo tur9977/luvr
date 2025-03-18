@@ -1,37 +1,49 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase/client"
 import type { Profile } from "@/lib/types/profiles"
+import { processImageForAvatar } from "@/lib/utils/image"
 
 export function useProfile() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
 
-  useEffect(() => {
-    fetchProfile()
-
-    // 監聽認證狀態變化
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.id)
-      
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        await fetchProfile()
-      } else if (event === 'SIGNED_OUT') {
-        setProfile(null)
-      }
-    })
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
-
-  const fetchProfile = async () => {
+  const createProfile = async (userId: string, email: string) => {
     try {
-      setLoading(true)
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: userId,
+            email: email,
+            username: email.split('@')[0], // 使用郵箱前綴作為默認用戶名
+            full_name: '',
+            avatar_url: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }
+        ])
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Error creating profile:', error)
+        throw error
+      }
+
+      console.log('Profile created successfully:', data)
+      return data
+    } catch (error) {
+      console.error('Error in createProfile:', error)
+      throw error
+    }
+  }
+
+  const fetchProfile = useCallback(async () => {
+    try {
       const { data: { user }, error: authError } = await supabase.auth.getUser()
 
       if (authError) {
@@ -41,15 +53,17 @@ export function useProfile() {
       }
 
       if (!user) {
+        console.log('No user found')
         setProfile(null)
         return
       }
 
+      console.log('Fetching profile for user:', user.id)
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single()
+        .maybeSingle()
 
       if (error) {
         console.error('Profile error:', error)
@@ -57,6 +71,15 @@ export function useProfile() {
         return
       }
 
+      if (!data) {
+        console.log('No profile found for user, creating new profile')
+        // 如果沒有找到個人資料，創建一個新的
+        const newProfile = await createProfile(user.id, user.email || '')
+        setProfile(newProfile)
+        return
+      }
+
+      console.log('Profile fetched successfully:', data)
       setProfile(data)
     } catch (error) {
       console.error('Error fetching profile:', error)
@@ -64,7 +87,29 @@ export function useProfile() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    // 初始加載
+    fetchProfile()
+
+    // 監聽認證狀態變化
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.id)
+      
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        console.log('Fetching profile after sign in')
+        await fetchProfile()
+      } else if (event === 'SIGNED_OUT') {
+        console.log('Clearing profile after sign out')
+        setProfile(null)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [fetchProfile])
 
   const updateProfile = async (updates: Partial<Profile>) => {
     try {
@@ -95,17 +140,20 @@ export function useProfile() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("未登入")
 
+      // 處理圖片
+      const processedFile = await processImageForAvatar(file)
+
       // 生成安全的文件名
-      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const fileExt = 'jpg' // 統一使用 jpg 格式
       const fileName = `${user.id}_${Date.now()}.${fileExt}`
 
       // 上傳文件
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(fileName, file, {
+        .upload(fileName, processedFile, {
           cacheControl: '3600',
           upsert: true,
-          contentType: file.type
+          contentType: 'image/jpeg'
         })
 
       if (uploadError) {
