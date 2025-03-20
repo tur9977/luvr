@@ -1,27 +1,41 @@
 "use client"
 
-import { Card } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { PostHeader } from "./PostHeader"
 import { PostContent } from "./PostContent"
 import { PostFooter } from "./PostFooter"
 import type { Database } from "@/lib/types/database.types"
 
-type Post = Database['public']['Tables']['posts']['Row']
-type Profile = Database['public']['Tables']['profiles']['Row']
-type Comment = Database['public']['Tables']['comments']['Row'] & {
-  profiles: {
-    id: string
-    username: string
-    avatar_url: string | null
-  }
+interface PostMedia {
+  id: string
+  media_url: string
+  media_type: "image" | "video"
+  aspect_ratio: number
+  duration?: number | null
+  order: number
+}
+
+type Post = {
+  id: string
+  user_id: string
+  media_url: string
+  media_type: "image" | "video"
+  thumbnail_url: string | null
+  aspect_ratio: number
+  duration?: number | null
+  caption: string | null
+  location: string | null
+  created_at: string
+  updated_at: string
+  post_media?: PostMedia[]
+}
+
+type Profile = {
+  username: string
+  avatar_url: string | null
 }
 
 export interface PostWithProfile extends Post {
-  id: string
-  user_id: string
-  caption: string | null
-  media_url: string | null
-  created_at: string
   profiles: Profile
   _count?: {
     likes: number
@@ -37,10 +51,29 @@ interface PostCardProps {
 }
 
 export function PostCard({ post }: PostCardProps) {
+  const mediaItems = post.post_media && post.post_media.length > 0
+    ? post.post_media.sort((a, b) => a.order - b.order)
+    : [{
+        id: post.id,
+        media_url: post.media_url,
+        media_type: post.media_type,
+        aspect_ratio: post.aspect_ratio,
+        duration: post.duration,
+        order: 0
+      }]
+
   return (
     <Card>
       <PostHeader post={post} />
-      <PostContent post={post} />
+      {post.caption && (
+        <CardContent className="py-2.5">
+          <p className="text-sm whitespace-pre-wrap">{post.caption}</p>
+        </CardContent>
+      )}
+      <PostContent
+        mediaItems={mediaItems}
+        thumbnail_url={post.thumbnail_url}
+      />
       <PostFooter post={post} />
     </Card>
   )

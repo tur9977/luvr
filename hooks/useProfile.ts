@@ -6,6 +6,14 @@ import { supabase } from "@/lib/supabase/client"
 import type { Profile } from "@/lib/types/profiles"
 import { processImageForAvatar } from "@/lib/utils/image"
 
+// 緩存過期時間（10分鐘）
+const CACHE_EXPIRY = 10 * 60 * 1000
+
+interface CachedProfile {
+  profile: Profile
+  timestamp: number
+}
+
 export function useProfile() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
@@ -19,7 +27,7 @@ export function useProfile() {
           {
             id: userId,
             email: email,
-            username: email.split('@')[0], // 使用郵箱前綴作為默認用戶名
+            username: email.split('@')[0],
             full_name: '',
             avatar_url: null,
             created_at: new Date().toISOString(),
@@ -34,7 +42,6 @@ export function useProfile() {
         throw error
       }
 
-      console.log('Profile created successfully:', data)
       return data
     } catch (error) {
       console.error('Error in createProfile:', error)
@@ -42,8 +49,43 @@ export function useProfile() {
     }
   }
 
-  const fetchProfile = useCallback(async () => {
+  const getCachedProfile = () => {
+    const cached = localStorage.getItem('userProfile')
+    if (!cached) return null
+
+    const { profile, timestamp }: CachedProfile = JSON.parse(cached)
+    const now = Date.now()
+
+    // 檢查緩存是否過期
+    if (now - timestamp > CACHE_EXPIRY) {
+      localStorage.removeItem('userProfile')
+      return null
+    }
+
+    return profile
+  }
+
+  const setCachedProfile = (profile: Profile) => {
+    const cacheData: CachedProfile = {
+      profile,
+      timestamp: Date.now()
+    }
+    localStorage.setItem('userProfile', JSON.stringify(cacheData))
+  }
+
+  const fetchProfile = useCallback(async (force = false) => {
     try {
+      // 如果不是強制更新，先嘗試使用緩存
+      if (!force) {
+        const cachedProfile = getCachedProfile()
+        if (cachedProfile) {
+          console.log('Using cached profile')
+          setProfile(cachedProfile)
+          setLoading(false)
+          return
+        }
+      }
+
       const { data: { user }, error: authError } = await supabase.auth.getUser()
 
       if (authError) {
@@ -73,14 +115,15 @@ export function useProfile() {
 
       if (!data) {
         console.log('No profile found for user, creating new profile')
-        // 如果沒有找到個人資料，創建一個新的
         const newProfile = await createProfile(user.id, user.email || '')
         setProfile(newProfile)
+        setCachedProfile(newProfile)
         return
       }
 
-      console.log('Profile fetched successfully:', data)
+      console.log('Profile fetched successfully')
       setProfile(data)
+      setCachedProfile(data)
     } catch (error) {
       console.error('Error fetching profile:', error)
       setProfile(null)
@@ -90,18 +133,20 @@ export function useProfile() {
   }, [])
 
   useEffect(() => {
-    // 初始加載
-    fetchProfile()
+    // 初始加載時使用緩存
+    fetchProfile(false)
 
     // 監聽認證狀態變化
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.id)
+      console.log('Auth state changed:', event)
       
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      if (event === 'SIGNED_IN') {
+        // 登入時強制更新配置文件
         console.log('Fetching profile after sign in')
-        await fetchProfile()
+        await fetchProfile(true)
       } else if (event === 'SIGNED_OUT') {
         console.log('Clearing profile after sign out')
+        localStorage.removeItem('userProfile')
         setProfile(null)
       }
     })
@@ -125,7 +170,8 @@ export function useProfile() {
 
       if (error) throw error
       
-      await fetchProfile()
+      // 更新後強制刷新配置文件
+      await fetchProfile(true)
     } catch (error) {
       console.error('Error updating profile:', error)
       throw error
@@ -140,14 +186,10 @@ export function useProfile() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error("未登入")
 
-      // 處理圖片
       const processedFile = await processImageForAvatar(file)
-
-      // 生成安全的文件名
-      const fileExt = 'jpg' // 統一使用 jpg 格式
+      const fileExt = 'jpg'
       const fileName = `${user.id}_${Date.now()}.${fileExt}`
 
-      // 上傳文件
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(fileName, processedFile, {
@@ -157,14 +199,10 @@ export function useProfile() {
         })
 
       if (uploadError) {
-        console.error("頭像上傳失敗:", {
-          error: uploadError,
-          message: uploadError.message
-        })
+        console.error("頭像上傳失敗:", uploadError)
         throw uploadError
       }
 
-      // 獲取公開URL並確保它是完整的URL
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(fileName)
@@ -173,11 +211,7 @@ export function useProfile() {
         throw new Error("無法獲取頭像公開訪問地址")
       }
 
-      // 確保URL是完整的
       const fullUrl = new URL(publicUrl).toString()
-      console.log("獲取到公開URL:", fullUrl)
-
-      // 更新個人資料
       await updateProfile({ avatar_url: fullUrl })
       toast.success("頭像已更新")
     } catch (error) {

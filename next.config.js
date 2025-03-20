@@ -22,6 +22,7 @@ const nextConfig = {
   // 生产环境配置
   productionBrowserSourceMaps: false,
   swcMinify: true,
+  transpilePackages: ['swiper'],
 }
 
 module.exports = nextConfig 

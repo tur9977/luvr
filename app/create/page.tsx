@@ -30,6 +30,11 @@ import { Swiper, SwiperSlide } from "swiper/react"
 import { Navigation, Pagination } from "swiper/modules"
 import { processVideo } from "@/lib/utils/video"
 
+// Import Swiper styles
+import "swiper/css"
+import "swiper/css/navigation"
+import "swiper/css/pagination"
+
 type MediaType = "image" | "video"
 
 function isImageType(type: MediaType): type is "image" {

@@ -20,11 +20,11 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { MoreHorizontal, Flag } from "lucide-react"
+import { MoreHorizontal, Flag, MapPin } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { zhTW } from "date-fns/locale"
 import { toast } from "sonner"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useProfile } from "@/hooks/useProfile"
 import type { PostWithProfile } from "./PostCard"
 
@@ -39,6 +39,25 @@ export function PostHeader({ post }: PostHeaderProps) {
   const [showReportDialog, setShowReportDialog] = useState(false)
   const [reportReason, setReportReason] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [timeAgo, setTimeAgo] = useState("")
+
+  useEffect(() => {
+    // 初始化時間顯示
+    setTimeAgo(formatDistanceToNow(new Date(post.created_at), {
+      addSuffix: true,
+      locale: zhTW
+    }))
+
+    // 每分鐘更新一次時間顯示
+    const timer = setInterval(() => {
+      setTimeAgo(formatDistanceToNow(new Date(post.created_at), {
+        addSuffix: true,
+        locale: zhTW
+      }))
+    }, 60000)
+
+    return () => clearInterval(timer)
+  }, [post.created_at])
 
   const handleDelete = async () => {
     try {
@@ -130,19 +149,23 @@ export function PostHeader({ post }: PostHeaderProps) {
               </AvatarFallback>
             </Avatar>
           </Link>
-          <div>
+          <div className="flex flex-wrap items-baseline gap-x-2">
             <Link
               href={`/profile/${post.user_id}`}
               className="text-sm font-medium hover:underline"
             >
               {post.profiles.username}
             </Link>
-            <p className="text-xs text-muted-foreground">
-              {formatDistanceToNow(new Date(post.created_at), {
-                addSuffix: true,
-                locale: zhTW
-              })}
-            </p>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground leading-none">
+              {post.location && (
+                <div className="flex items-center gap-0.5">
+                  <MapPin className="h-3 w-3" />
+                  <span>{post.location}</span>
+                </div>
+              )}
+              <span className="leading-none">·</span>
+              <span>{timeAgo || "剛剛"}</span>
+            </div>
           </div>
         </div>
         <DropdownMenu>

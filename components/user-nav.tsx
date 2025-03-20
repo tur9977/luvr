@@ -14,14 +14,12 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ProfileSettingsDialog } from "./profile-settings-dialog"
 import { LogOut } from "lucide-react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
 import { useEffect } from "react"
 
 export function UserNav() {
   const { profile } = useProfile()
   const router = useRouter()
-  const supabase = createClientComponentClient()
 
   useEffect(() => {
     if (profile) {
@@ -39,8 +37,9 @@ export function UserNav() {
     try {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
-      router.refresh()
-      router.push("/auth")
+      
+      // 使用 window.location.href 進行頁面跳轉
+      window.location.href = "/auth/login"
     } catch (error) {
       console.error("登出失敗:", error)
     }
@@ -104,7 +103,7 @@ export function UserNav() {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="text-red-600 focus:text-red-600 focus:bg-red-100"
-          onSelect={handleSignOut}
+          onClick={handleSignOut}
         >
           <LogOut className="mr-2 h-4 w-4" />
           登出

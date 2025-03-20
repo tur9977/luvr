@@ -6,6 +6,15 @@ import { PostList } from "@/components/posts/PostList"
 import type { PostWithProfile } from "@/components/posts/PostCard"
 import { EventList } from "@/components/events/EventList"
 
+interface PostMedia {
+  id: string
+  media_url: string
+  media_type: "image" | "video"
+  aspect_ratio: number
+  duration?: number | null
+  order: number
+}
+
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
@@ -13,6 +22,7 @@ async function getPosts(): Promise<PostWithProfile[]> {
   try {
     const supabase = createServerComponentClient<Database>({ cookies })
     
+    // 首先獲取貼文數據
     const { data: posts, error: postsError } = await supabase
       .from('posts')
       .select(`
@@ -21,6 +31,14 @@ async function getPosts(): Promise<PostWithProfile[]> {
           id,
           username,
           avatar_url
+        ),
+        post_media (
+          id,
+          media_url,
+          media_type,
+          aspect_ratio,
+          duration,
+          order
         ),
         likes(count),
         comments(
@@ -46,36 +64,43 @@ async function getPosts(): Promise<PostWithProfile[]> {
       return []
     }
 
-    // 獲取當前用戶是否對每個貼文按讚
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (user && !userError) {
-      const { data: userLikes } = await supabase
-        .from('likes')
-        .select('post_id')
-        .eq('user_id', user.id)
-
-      const likedPostIds = new Set(userLikes?.map(like => like.post_id))
+    let userLikedPosts = new Set<string>()
+    
+    try {
+      // 嘗試獲取用戶會話
+      const { data: { session } } = await supabase.auth.getSession()
       
-      posts.forEach(post => {
-        post.has_liked = likedPostIds.has(post.id)
-        post._count = {
-          likes: post.likes?.[0]?.count || 0,
-          comments: post.comments?.length || 0,
-          shares: post.shares?.[0]?.count || 0
-        }
-      })
-    } else {
-      posts.forEach(post => {
-        post.has_liked = false
-        post._count = {
-          likes: post.likes?.[0]?.count || 0,
-          comments: post.comments?.length || 0,
-          shares: post.shares?.[0]?.count || 0
-        }
-      })
+      // 如果有會話，則獲取用戶的讚
+      if (session?.user) {
+        const { data: userLikes } = await supabase
+          .from('likes')
+          .select('post_id')
+          .eq('user_id', session.user.id)
+        
+        userLikedPosts = new Set(userLikes?.map(like => like.post_id) || [])
+      }
+    } catch (error) {
+      console.error('獲取用戶會話時出錯:', error)
+      // 繼續處理貼文，但不包含用戶特定的數據
     }
 
-    return posts as PostWithProfile[]
+    // 處理每個貼文
+    const processedPosts = posts.map(post => {
+      return {
+        ...post,
+        media_type: post.media_type || (post.media_url?.match(/\.(mp4|mov|webm)$/i) ? 'video' : 'image'),
+        aspect_ratio: post.aspect_ratio || 1,
+        has_liked: userLikedPosts.has(post.id),
+        post_media: (post.post_media as PostMedia[] | null)?.sort((a, b) => a.order - b.order) || [],
+        _count: {
+          likes: post.likes?.[0]?.count || 0,
+          comments: post.comments?.length || 0,
+          shares: post.shares?.[0]?.count || 0
+        }
+      }
+    })
+
+    return processedPosts as PostWithProfile[]
   } catch (error) {
     console.error('獲取貼文時發生異常:', error)
     return []

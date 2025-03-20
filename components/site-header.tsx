@@ -50,10 +50,6 @@ export function SiteHeader() {
   const { profile, loading } = useProfile()
   const router = useRouter()
 
-  const handleNavigation = (path: string) => {
-    router.push(path)
-  }
-
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 max-w-2xl items-center">
@@ -72,7 +68,10 @@ export function SiteHeader() {
           </span>
         </Link>
         <div className="flex items-center ml-auto gap-2">
-          {!loading && (
+          {loading ? (
+            // 加載中顯示占位符
+            <div className="w-20 h-8 bg-muted animate-pulse rounded-md"></div>
+          ) : (
             <>
               {profile ? (
                 <>
@@ -95,7 +94,7 @@ export function SiteHeader() {
                     size="sm" 
                     asChild
                   >
-                    <Link href="/auth" aria-label="登入">
+                    <Link href="/auth/login" aria-label="登入">
                       登入
                     </Link>
                   </Button>
@@ -104,7 +103,7 @@ export function SiteHeader() {
                     className="bg-[#8A6FD4] hover:bg-[#7857C8]"
                     asChild
                   >
-                    <Link href="/auth?tab=register" aria-label="註冊">
+                    <Link href="/auth/register" aria-label="註冊">
                       註冊
                     </Link>
                   </Button>

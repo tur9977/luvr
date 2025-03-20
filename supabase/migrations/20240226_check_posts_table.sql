@@ -38,7 +38,7 @@ CREATE POLICY "允許用戶更新自己的貼文" ON posts
     USING (auth.uid() = user_id)
     WITH CHECK (auth.uid() = user_id);
 
--- 檢查 posts 表是否存在
+-- 檢查 posts 表是否存在，如果不存在則創建
 DO $$ 
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'posts') THEN
@@ -46,7 +46,7 @@ BEGIN
     CREATE TABLE posts (
       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-      media_url TEXT NOT NULL,
+      media_urls TEXT[] NOT NULL,
       media_type TEXT NOT NULL CHECK (media_type IN ('image', 'video')),
       thumbnail_url TEXT,
       aspect_ratio FLOAT NOT NULL,
