@@ -26,6 +26,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Swiper, SwiperSlide } from "swiper/react"
+import { Navigation, Pagination } from "swiper/modules"
+import { processVideo } from "@/lib/utils/video"
+
+type MediaType = "image" | "video"
+
+function isImageType(type: MediaType): type is "image" {
+  return type === "image"
+}
+
+function isVideoType(type: MediaType): type is "video" {
+  return type === "video"
+}
 
 export default function CreatePage() {
   const { toast } = useToast()
@@ -34,9 +47,9 @@ export default function CreatePage() {
   const { user } = useUser()
   const [date, setDate] = useState<Date>()
   const [isUploading, setIsUploading] = useState(false)
-  const [mediaFile, setMediaFile] = useState<File | null>(null)
-  const [mediaPreview, setMediaPreview] = useState<string | null>(null)
-  const [mediaType, setMediaType] = useState<"image" | "video" | null>(null)
+  const [mediaFiles, setMediaFiles] = useState<File[]>([])
+  const [mediaPreviews, setMediaPreviews] = useState<string[]>([])
+  const [mediaType, setMediaType] = useState<MediaType | null>(null)
   const [caption, setCaption] = useState("")
   const [location, setLocation] = useState("")
   const [eventTitle, setEventTitle] = useState("")
@@ -47,13 +60,30 @@ export default function CreatePage() {
   const [eventType, setEventType] = useState("social")
   const [isCreatingEvent, setIsCreatingEvent] = useState(false)
 
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const removeMedia = useCallback((index: number) => {
+    setMediaFiles(prev => {
+      const newFiles = [...prev]
+      newFiles.splice(index, 1)
+      return newFiles
+    })
+    setMediaPreviews(prev => {
+      const newPreviews = [...prev]
+      URL.revokeObjectURL(newPreviews[index]) // 釋放 URL 對象
+      newPreviews.splice(index, 1)
+      return newPreviews
+    })
+    if (mediaFiles.length === 1) {
+      setMediaType(null)
+    }
+  }, [mediaFiles])
+
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (!files.length) return
 
     // 檢查文件類型
-    const isImage = file.type.startsWith("image/")
-    const isVideo = file.type.startsWith("video/")
+    const isImage = files[0].type.startsWith("image/")
+    const isVideo = files[0].type.startsWith("video/")
 
     if (!isImage && !isVideo) {
       toast({
@@ -64,35 +94,43 @@ export default function CreatePage() {
       return
     }
 
-    // 檢查文件大小（20MB 限制）
-    if (file.size > 20 * 1024 * 1024) {
+    // 如果是圖片，檢查數量限制
+    if (isImage && files.length > 4) {
       toast({
         variant: "destructive",
-        title: "文件太大",
-        description: "請上傳小於 20MB 的文件",
+        title: "圖片數量過多",
+        description: "最多只能上傳4張圖片",
       })
       return
     }
 
-    setMediaFile(file)
-    setMediaType(isImage ? "image" : "video")
+    try {
+      // 直接使用原始文件，不進行處理
+      setMediaFiles(files)
+      setMediaType(isImage ? "image" : "video")
 
-    // 創建預覽 URL
-    const previewUrl = URL.createObjectURL(file)
-    setMediaPreview(previewUrl)
-
-    return () => {
-      URL.revokeObjectURL(previewUrl)
+      // 創建預覽 URL
+      const previewUrls = files.map(file => URL.createObjectURL(file))
+      setMediaPreviews(previewUrls)
+    } catch (error) {
+      console.error("處理文件時出錯:", error)
+      toast({
+        variant: "destructive",
+        title: "處理失敗",
+        description: error instanceof Error ? error.message : "處理文件時出錯，請稍後再試",
+      })
+    } finally {
+      setIsUploading(false)
     }
   }, [toast])
 
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
-    const file = e.dataTransfer.files[0]
-    if (!file) return
+    const files = Array.from(e.dataTransfer.files)
+    if (!files.length) return
 
-    const isImage = file.type.startsWith("image/")
-    const isVideo = file.type.startsWith("video/")
+    const isImage = files[0].type.startsWith("image/")
+    const isVideo = files[0].type.startsWith("video/")
 
     if (!isImage && !isVideo) {
       toast({
@@ -103,33 +141,68 @@ export default function CreatePage() {
       return
     }
 
-    if (file.size > 20 * 1024 * 1024) {
+    // 如果是圖片，檢查數量限制
+    if (isImage && files.length > 4) {
       toast({
         variant: "destructive",
-        title: "文件太大",
-        description: "請上傳小於 20MB 的文件",
+        title: "圖片數量過多",
+        description: "最多只能上傳4張圖片",
       })
       return
     }
 
-    setMediaFile(file)
-    setMediaType(isImage ? "image" : "video")
-    const previewUrl = URL.createObjectURL(file)
-    setMediaPreview(previewUrl)
+    try {
+      // 直接使用原始文件，不進行處理
+      setMediaFiles(files)
+      setMediaType(isImage ? "image" : "video")
+      const previewUrls = files.map(file => URL.createObjectURL(file))
+      setMediaPreviews(previewUrls)
+    } catch (error) {
+      console.error("處理文件時出錯:", error)
+      toast({
+        variant: "destructive",
+        title: "處理失敗",
+        description: error instanceof Error ? error.message : "處理文件時出錯，請稍後再試",
+      })
+    } finally {
+      setIsUploading(false)
+    }
   }, [toast])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!profile) {
+    
+    // 防止重複提交
+    if (isUploading) {
+      return
+    }
+
+    console.log('Submit button clicked')
+
+    if (!user) {
+      console.error('No user found')
       toast({
         variant: "destructive",
         title: "請先登入",
         description: "您需要登入才能發布貼文",
       })
+      router.push('/auth/login')
       return
     }
 
-    if (!mediaFile || !mediaType) {
+    if (!profile) {
+      console.error('No profile found')
+      toast({
+        variant: "destructive",
+        title: "找不到用戶資料",
+        description: "請重新登入後再試",
+      })
+      return
+    }
+
+    // 檢查媒體文件
+    if (!mediaFiles.length || !mediaType) {
+      console.error('Missing media:', { mediaFiles, mediaType })
       toast({
         variant: "destructive",
         title: "請選擇媒體文件",
@@ -140,147 +213,150 @@ export default function CreatePage() {
 
     try {
       setIsUploading(true)
-      console.log("開始上傳媒體文件...", {
-        fileName: mediaFile.name,
-        fileType: mediaFile.type,
-        fileSize: `${(mediaFile.size / (1024 * 1024)).toFixed(2)}MB`
-      })
-
-      // 檢查文件類型和大小
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime']
-      if (!allowedTypes.includes(mediaFile.type)) {
-        throw new Error(`不支持的文件類型: ${mediaFile.type}`)
-      }
-
-      if (mediaFile.size > 52428800) { // 50MB in bytes
-        throw new Error(`文件大小超過限制: ${(mediaFile.size / (1024 * 1024)).toFixed(2)}MB`)
-      }
+      console.log('Starting upload process with files:', mediaFiles.map(f => ({ name: f.name, type: f.type, size: f.size })))
 
       // 上傳媒體文件
-      const mediaExt = mediaFile.name.split(".").pop()
-      const mediaPath = `${profile.id}/${Date.now()}.${mediaExt}`
+      const mediaItems = await Promise.all(
+        mediaFiles.map(async (file, index) => {
+          const mediaExt = file.name.split(".").pop()
+          const mediaPath = `${profile.id}/${Date.now()}_${Math.random().toString(36).substring(2)}.${mediaExt}`
+          console.log('Processing file:', { mediaPath, type: file.type })
 
-      const { error: uploadError } = await supabase.storage
-        .from("posts")
-        .upload(mediaPath, mediaFile, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: mediaFile.type
-        })
+          let aspectRatio = 1
+          let duration = null
 
-      if (uploadError) {
-        console.error("媒體文件上傳錯誤:", uploadError.message)
-        throw new Error("媒體文件上傳失敗")
-      }
-
-      // 獲取媒體 URL
-      const { data: { publicUrl: mediaUrl } } = supabase.storage
-        .from("posts")
-        .getPublicUrl(mediaPath)
-
-      // 創建縮略圖（如果是視頻）
-      let thumbnailUrl = null
-      if (mediaType === "video") {
-        console.log("開始生成視頻縮圖...")
-        const video = document.createElement("video")
-        video.src = URL.createObjectURL(mediaFile)
-        
-        try {
-          await new Promise((resolve, reject) => {
-            video.onloadeddata = () => {
-              try {
-                video.currentTime = 1
-                video.onseeked = resolve
-                video.onerror = reject
-              } catch (err) {
-                reject(err)
-              }
+          try {
+            // 獲取媒體文件的寬高比和時長
+            const isImage = file.type.startsWith('image/')
+            if (isImage) {
+              aspectRatio = await new Promise<number>((resolve) => {
+                const img = document.createElement('img')
+                img.onload = () => {
+                  const ratio = img.width / img.height
+                  URL.revokeObjectURL(img.src)
+                  resolve(ratio)
+                }
+                img.src = URL.createObjectURL(file)
+              })
+              console.log('Image aspect ratio:', aspectRatio)
+            } else {
+              const video = document.createElement('video')
+              video.preload = 'metadata'
+              await new Promise<void>((resolve) => {
+                video.onloadedmetadata = () => {
+                  duration = Math.round(video.duration)
+                  aspectRatio = video.videoWidth / video.videoHeight
+                  URL.revokeObjectURL(video.src)
+                  resolve()
+                }
+                video.src = URL.createObjectURL(file)
+              })
+              console.log('Video metadata:', { duration, aspectRatio })
             }
-            video.onerror = reject
-          })
 
-          const canvas = document.createElement("canvas")
-          canvas.width = video.videoWidth
-          canvas.height = video.videoHeight
-          const ctx = canvas.getContext("2d")
-          if (!ctx) throw new Error("無法創建 canvas context")
-          
-          ctx.drawImage(video, 0, 0)
-          
-          const thumbnailBlob = await new Promise<Blob>((resolve, reject) => {
-            canvas.toBlob(
-              (blob) => {
-                if (blob) resolve(blob)
-                else reject(new Error("無法創建縮圖"))
-              },
-              "image/jpeg",
-              0.7
-            )
-          })
+            // 上傳文件
+            console.log('Uploading file to storage:', { mediaPath })
+            const { error: uploadError } = await supabase.storage
+              .from('posts')
+              .upload(mediaPath, file)
 
-          const thumbnailPath = `${profile.id}/${Date.now()}_thumb.jpg`
-          const { error: thumbError, data: thumbData } = await supabase.storage
-            .from("posts")
-            .upload(thumbnailPath, thumbnailBlob, {
-              cacheControl: "3600",
-              upsert: false,
-              contentType: "image/jpeg"
-            })
+            if (uploadError) {
+              console.error('Upload error:', uploadError)
+              throw uploadError
+            }
 
-          if (thumbError) {
-            console.error("縮圖上傳錯誤:", {
-              error: thumbError,
-              message: thumbError.message,
-            })
-            throw thumbError
+            // 獲取公開訪問 URL
+            const { data: { publicUrl } } = supabase.storage
+              .from('posts')
+              .getPublicUrl(mediaPath)
+
+            console.log('File uploaded successfully:', { publicUrl })
+
+            return {
+              media_url: publicUrl,
+              media_type: isImage ? 'image' : 'video',
+              aspect_ratio: aspectRatio,
+              duration: duration,
+              order: index
+            }
+          } catch (error) {
+            console.error('Error processing file:', error)
+            throw new Error(`處理文件 ${file.name} 時出錯: ${error instanceof Error ? error.message : '未知錯誤'}`)
           }
+        })
+      )
 
-          console.log("縮圖上傳成功:", thumbData)
-
-          const { data: { publicUrl: thumbUrl } } = supabase.storage
-            .from("posts")
-            .getPublicUrl(thumbnailPath)
-
-          thumbnailUrl = thumbUrl
-          console.log("獲取到縮圖 URL:", thumbnailUrl)
-        } catch (err) {
-          console.error("生成縮圖過程中出錯:", err)
-          // 繼續執行，即使沒有縮圖
-        } finally {
-          URL.revokeObjectURL(video.src)
-        }
-      }
+      console.log('All media items processed:', mediaItems)
 
       // 創建貼文
-      const { error: insertError } = await supabase
-        .from("posts")
-        .insert({
-          media_url: mediaUrl,
-          media_type: mediaType,
-          caption,
-          location,
-          thumbnail_url: thumbnailUrl,
-          user_id: profile.id,
-        })
+      const postData = {
+        user_id: profile.id,
+        caption: caption.trim(),
+        location: location.trim()
+      }
+      
+      console.log('Creating post with data:', postData)
+
+      const { data: post, error: insertError } = await supabase
+        .from('posts')
+        .insert(postData)
+        .select()
+        .single()
 
       if (insertError) {
-        console.error("貼文創建錯誤:", insertError.message)
-        throw new Error("貼文創建失敗")
+        console.error('Insert error:', insertError)
+        throw new Error(`發布貼文失敗: ${insertError.message}`)
       }
+
+      console.log('Post created successfully:', post)
+
+      // 創建媒體記錄
+      const mediaRecords = mediaItems.map(item => ({
+        post_id: post.id,
+        media_url: item.media_url,
+        media_type: item.media_type,
+        aspect_ratio: Number(item.aspect_ratio),
+        duration: item.duration,
+        order: item.order
+      }))
+
+      console.log('Creating media records:', mediaRecords)
+
+      const { error: mediaError } = await supabase
+        .from('post_media')
+        .insert(mediaRecords)
+
+      if (mediaError) {
+        console.error('Media insert error:', mediaError)
+        // 如果媒體插入失敗，刪除已創建的貼文
+        await supabase.from('posts').delete().eq('id', post.id)
+        throw new Error(`添加媒體文件失敗: ${mediaError.message}`)
+      }
+
+      console.log('Media records created successfully')
 
       toast({
         title: "發布成功",
         description: "您的貼文已成功發布",
       })
 
-      router.replace("/")
+      // 重置表單
+      setMediaFiles([])
+      setMediaPreviews([])
+      setMediaType(null)
+      setCaption("")
+      setLocation("")
+      
+      // 導航到首頁
+      router.push('/')
       router.refresh()
+
     } catch (error) {
-      console.error("完整錯誤詳情:", error)
+      console.error('Error in handleSubmit:', error)
       toast({
         variant: "destructive",
         title: "發布失敗",
-        description: error instanceof Error ? error.message : "上傳過程中發生錯誤，請稍後再試",
+        description: error instanceof Error ? error.message : "發布貼文時出錯，請稍後再試",
       })
     } finally {
       setIsUploading(false)
@@ -288,13 +364,11 @@ export default function CreatePage() {
   }
 
   const clearMedia = useCallback(() => {
-    if (mediaPreview) {
-      URL.revokeObjectURL(mediaPreview)
-    }
-    setMediaFile(null)
-    setMediaPreview(null)
+    mediaPreviews.forEach(url => URL.revokeObjectURL(url))
+    setMediaFiles([])
+    setMediaPreviews([])
     setMediaType(null)
-  }, [mediaPreview])
+  }, [mediaPreviews])
 
   const handleEventCoverSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -493,7 +567,10 @@ export default function CreatePage() {
                 <div className="space-y-2">
                   <Label>上傳媒體</Label>
                   <div
-                    className="relative flex items-center justify-center w-full h-48 border-2 border-dashed rounded-lg bg-muted/50"
+                    className={cn(
+                      "relative flex items-center justify-center w-full h-48 border-2 border-dashed rounded-lg bg-muted/50",
+                      isUploading && "pointer-events-none opacity-50"
+                    )}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={handleDrop}
                   >
@@ -502,31 +579,82 @@ export default function CreatePage() {
                         <Loader2 className="h-8 w-8 animate-spin" />
                         <p className="text-sm text-muted-foreground">上傳中...</p>
                       </div>
-                    ) : mediaPreview ? (
+                    ) : mediaPreviews.length > 0 ? (
                       <div className="relative w-full h-full">
-                        {mediaType === "image" ? (
-                          <Image
-                            src={mediaPreview}
-                            alt="Preview"
-                            fill
-                            className="object-contain"
-                          />
+                        {mediaType === "image" && mediaPreviews.length > 1 ? (
+                          <div className="relative w-full h-48">
+                            <Swiper
+                              modules={[Navigation, Pagination]}
+                              navigation
+                              pagination={{ clickable: true }}
+                              className="h-full rounded-lg"
+                              spaceBetween={0}
+                            >
+                              {mediaPreviews.map((preview, index) => (
+                                <SwiperSlide key={index} className="relative h-48">
+                                  <div className="relative w-full h-full flex items-center justify-center">
+                                    <Image
+                                      src={preview}
+                                      alt={`Preview ${index + 1}`}
+                                      fill
+                                      className="object-contain"
+                                      priority={index === 0}
+                                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="destructive"
+                                      size="icon"
+                                      className="absolute top-2 right-2 z-10"
+                                      onClick={() => removeMedia(index)}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </SwiperSlide>
+                              ))}
+                            </Swiper>
+                          </div>
+                        ) : mediaType === "video" ? (
+                          <div className="relative w-full h-full">
+                            <video
+                              src={mediaPreviews[0]}
+                              className="w-full h-full object-contain"
+                              controls
+                            />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="icon"
+                              className="absolute top-2 right-2 z-10"
+                              onClick={() => removeMedia(0)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
                         ) : (
-                          <video
-                            src={mediaPreview}
-                            className="w-full h-full object-contain"
-                            controls
-                          />
+                          <div className="relative w-full h-48">
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <Image
+                                src={mediaPreviews[0]}
+                                alt="Preview"
+                                fill
+                                className="object-contain"
+                                priority
+                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                              />
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="icon"
+                                className="absolute top-2 right-2 z-10"
+                                onClick={() => removeMedia(0)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
                         )}
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-2 right-2"
-                          onClick={clearMedia}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
                       </div>
                     ) : (
                       <label className="flex flex-col items-center gap-2 cursor-pointer">
@@ -534,6 +662,7 @@ export default function CreatePage() {
                           type="file"
                           className="hidden"
                           accept="image/*,video/*"
+                          multiple
                           onChange={handleFileSelect}
                         />
                         <div className="flex gap-2">
@@ -655,6 +784,8 @@ export default function CreatePage() {
                           alt="Event cover preview"
                           fill
                           className="object-cover rounded-lg"
+                          priority
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         />
                         <Button
                           type="button"
@@ -719,8 +850,8 @@ export default function CreatePage() {
 
 // 獲取圖片寬高比
 const getImageAspectRatio = (file: File): Promise<number> => {
-  return new Promise((resolve) => {
-    const img = document.createElement("img")
+  return new Promise<number>((resolve) => {
+    const img = document.createElement('img')
     img.onload = () => {
       resolve(img.width / img.height)
       URL.revokeObjectURL(img.src)
@@ -731,8 +862,8 @@ const getImageAspectRatio = (file: File): Promise<number> => {
 
 // 獲取視頻寬高比
 const getVideoAspectRatio = (file: File): Promise<number> => {
-  return new Promise((resolve) => {
-    const video = document.createElement("video")
+  return new Promise<number>((resolve) => {
+    const video = document.createElement('video')
     video.onloadedmetadata = () => {
       resolve(video.videoWidth / video.videoHeight)
       URL.revokeObjectURL(video.src)
@@ -743,8 +874,8 @@ const getVideoAspectRatio = (file: File): Promise<number> => {
 
 // 獲取視頻時長（秒）
 const getVideoDuration = (file: File): Promise<number> => {
-  return new Promise((resolve) => {
-    const video = document.createElement("video")
+  return new Promise<number>((resolve) => {
+    const video = document.createElement('video')
     video.onloadedmetadata = () => {
       resolve(Math.round(video.duration))
       URL.revokeObjectURL(video.src)
