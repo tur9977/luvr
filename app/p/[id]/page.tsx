@@ -4,17 +4,45 @@ import { notFound } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { formatDistanceToNow } from "date-fns"
 import { zhTW } from "date-fns/locale"
+import { PostContent } from "@/components/posts/PostContent"
+import { Card } from "@/components/ui/card"
+import type { PostWithProfile } from "@/components/posts/PostCard"
+
+interface PostComment {
+  id: string
+  content: string
+  created_at: string
+  profiles: {
+    username: string
+    avatar_url: string | null
+  }
+}
+
+interface ExtendedPost extends Omit<PostWithProfile, 'comments'> {
+  likes: { count: number }
+  comments: PostComment[]
+  commentsCount: number
+  shares: { count: number }
+}
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-async function getPost(postId: string) {
+async function getPost(postId: string): Promise<ExtendedPost | null> {
   const supabase = createServerComponentClient({ cookies })
   
   const { data: post, error } = await supabase
     .from('posts')
     .select(`
       *,
+      post_media (
+        id,
+        media_url,
+        media_type,
+        aspect_ratio,
+        duration,
+        order
+      ),
       profiles:profiles!inner(
         id,
         username,
@@ -55,7 +83,7 @@ async function getPost(postId: string) {
   return {
     ...post,
     likes: { count: likesCount || 0 },
-    comments: comments || [],
+    comments: (comments || []) as PostComment[],
     commentsCount: commentsCount || 0,
     shares: { count: sharesCount || 0 }
   }
@@ -70,49 +98,36 @@ export default async function PostPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="container max-w-2xl py-8 space-y-8">
-      {/* 作者資訊 */}
-      <div className="flex items-center gap-3">
-        <Avatar>
-          <AvatarImage src={post.profiles.avatar_url || '/placeholder.svg'} />
-          <AvatarFallback>
-            {post.profiles.username.charAt(0).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
-        <div>
-          <div className="font-medium">{post.profiles.username}</div>
-          <div className="text-sm text-muted-foreground">
-            {formatDistanceToNow(new Date(post.created_at), {
-              addSuffix: true,
-              locale: zhTW
-            })}
+      <Card>
+        {/* 作者資訊 */}
+        <div className="p-4 flex items-center gap-3">
+          <Avatar>
+            <AvatarImage src={post.profiles.avatar_url || '/placeholder.svg'} />
+            <AvatarFallback>
+              {post.profiles.username.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <div className="font-medium">{post.profiles.username}</div>
+            <div className="text-sm text-muted-foreground">
+              {formatDistanceToNow(new Date(post.created_at), {
+                addSuffix: true,
+                locale: zhTW
+              })}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* 貼文內容 */}
-      <div className="space-y-4">
-        {post.caption && (
-          <p className="text-lg leading-relaxed whitespace-pre-wrap break-words">
-            {post.caption}
-          </p>
-        )}
-        {post.media_url && (
-          <div className="relative aspect-square">
-            <img
-              src={post.media_url}
-              alt="貼文圖片"
-              className="absolute inset-0 w-full h-full object-cover rounded-lg"
-            />
-          </div>
-        )}
-      </div>
+        {/* 貼文內容 */}
+        <PostContent post={post} />
 
-      {/* 互動數據 */}
-      <div className="flex gap-4 text-sm text-muted-foreground">
-        <div>{post.likes.count} 個讚</div>
-        <div>{post.commentsCount} 則留言</div>
-        <div>{post.shares.count} 次分享</div>
-      </div>
+        {/* 互動數據 */}
+        <div className="p-4 flex gap-4 text-sm text-muted-foreground">
+          <div>{post.likes.count} 個讚</div>
+          <div>{post.commentsCount} 則留言</div>
+          <div>{post.shares.count} 次分享</div>
+        </div>
+      </Card>
 
       {/* 留言列表 */}
       <div className="space-y-4">

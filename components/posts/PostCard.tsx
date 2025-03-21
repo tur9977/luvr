@@ -15,6 +15,16 @@ interface PostMedia {
   order: number
 }
 
+interface PostComment {
+  id: string
+  content: string
+  created_at: string
+  profiles: {
+    username: string
+    avatar_url: string | null
+  }
+}
+
 type Post = {
   id: string
   user_id: string
@@ -43,7 +53,7 @@ export interface PostWithProfile extends Post {
     shares: number
   }
   has_liked?: boolean
-  comments?: Comment[]
+  comments?: PostComment[]
 }
 
 interface PostCardProps {
@@ -70,10 +80,7 @@ export function PostCard({ post }: PostCardProps) {
           <p className="text-sm whitespace-pre-wrap">{post.caption}</p>
         </CardContent>
       )}
-      <PostContent
-        mediaItems={mediaItems}
-        thumbnail_url={post.thumbnail_url}
-      />
+      <PostContent post={post} />
       <PostFooter post={post} />
     </Card>
   )
