@@ -11,9 +11,23 @@ import { PostActions } from "@/components/PostActions"
 import { FollowButton } from "@/components/FollowButton"
 import type { Database } from "@/lib/types/database.types"
 import type { Metadata } from "next"
+import dynamic from "next/dynamic"
+
+const MediaGallery = dynamic(() => import("@/components/MediaGallery"), {
+  ssr: false,
+})
 
 interface Props {
   params: { id: string }
+}
+
+interface PostMedia {
+  id: string
+  media_url: string
+  media_type: string
+  aspect_ratio: number
+  duration: number | null
+  order: number
 }
 
 export default async function ProfilePage({ params }: Props) {
@@ -39,6 +53,14 @@ export default async function ProfilePage({ params }: Props) {
         id,
         username,
         avatar_url
+      ),
+      post_media (
+        id,
+        media_url,
+        media_type,
+        aspect_ratio,
+        duration,
+        order
       ),
       likes(count),
       comments(
@@ -118,6 +140,14 @@ export default async function ProfilePage({ params }: Props) {
           id,
           username,
           avatar_url
+        ),
+        post_media (
+          id,
+          media_url,
+          media_type,
+          aspect_ratio,
+          duration,
+          order
         )
       )
     `)
@@ -253,25 +283,9 @@ export default async function ProfilePage({ params }: Props) {
                       <p className="mt-4">{post.caption}</p>
                     )}
                   </div>
-                  <div className="relative aspect-square">
-                    {post.media_type === "video" ? (
-                      <video
-                        src={post.media_url}
-                        poster={post.thumbnail_url || undefined}
-                        controls
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <Image
-                        src={post.media_url}
-                        alt={post.caption || "Post image"}
-                        fill
-                        className="object-cover"
-                        priority={formattedPosts.indexOf(post) === 0}
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      />
-                    )}
-                  </div>
+                  {post.post_media && post.post_media.length > 0 && (
+                    <MediaGallery media={post.post_media} caption={post.caption} priority={formattedPosts.indexOf(post) === 0} />
+                  )}
                   <div className="p-4">
                     <PostActions
                       postId={post.id}
@@ -321,25 +335,9 @@ export default async function ProfilePage({ params }: Props) {
                       <p className="mt-4">{post.caption}</p>
                     )}
                   </div>
-                  <div className="relative aspect-square">
-                    {post.media_type === "video" ? (
-                      <video
-                        src={post.media_url}
-                        poster={post.thumbnail_url || undefined}
-                        controls
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <Image
-                        src={post.media_url}
-                        alt={post.caption || "Post image"}
-                        fill
-                        className="object-cover"
-                        priority={formattedLikedPosts.indexOf(post) === 0}
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      />
-                    )}
-                  </div>
+                  {post.post_media && post.post_media.length > 0 && (
+                    <MediaGallery media={post.post_media} caption={post.caption} priority={formattedLikedPosts.indexOf(post) === 0} />
+                  )}
                   <div className="p-4">
                     <PostActions
                       postId={post.id}

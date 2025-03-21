@@ -32,15 +32,21 @@ export function EventReminder({ eventId, eventDate }: EventReminderProps) {
   }, [profile, eventId])
 
   const fetchReminderSetting = async () => {
+    if (!profile) return
+
     try {
       const { data, error } = await supabase
         .from("event_notifications")
         .select("remind_before")
         .eq("event_id", eventId)
-        .eq("user_id", profile?.id)
-        .single()
+        .eq("user_id", profile.id)
+        .maybeSingle()
 
-      if (error) throw error
+      if (error) {
+        console.error("Error fetching reminder setting:", error)
+        return
+      }
+
       if (data) {
         setReminderTime(data.remind_before)
       }

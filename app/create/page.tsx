@@ -484,8 +484,8 @@ export default function CreatePage() {
           })
 
         if (uploadError) {
-          console.error("封面圖片上傳錯誤:", uploadError.message)
-          throw new Error("封面圖片上傳失敗")
+          console.error("封面圖片上傳錯誤:", uploadError)
+          throw new Error(`封面圖片上傳失敗: ${uploadError.message}`)
         }
 
         const { data: { publicUrl } } = supabase.storage
