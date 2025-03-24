@@ -34,7 +34,11 @@ export default function ProfilePage() {
       {/* 個人資料卡片 */}
       <div className="flex flex-col items-center text-center mb-8">
         <Avatar className="w-32 h-32 border-4 border-background shadow-xl mb-4">
-          <AvatarImage src={profile.avatar_url || "/placeholder.svg"} alt="Profile picture" />
+          <AvatarImage 
+            src={profile.avatar_url || "/placeholder.svg"} 
+            alt="Profile picture"
+            className="w-full h-full object-cover"
+          />
           <AvatarFallback className="text-4xl">{profile.full_name?.[0] || profile.username?.[0] || "U"}</AvatarFallback>
         </Avatar>
 

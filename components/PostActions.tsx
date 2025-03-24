@@ -359,6 +359,7 @@ export function PostActions({
                     <Avatar>
                       <AvatarImage
                         src={comment.profiles?.avatar_url || "/placeholder.svg"}
+                        className="w-full h-full object-cover"
                       />
                       <AvatarFallback>
                         {(comment.profiles?.username || "U")

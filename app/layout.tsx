@@ -10,6 +10,13 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Luvr - LGBTQ+ 社交平台",
   description: "一個專為 LGBTQ+ 社群打造的社交平台",
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon.png', type: 'image/png' }
+    ],
+    shortcut: '/favicon.ico'
+  }
 }
 
 export default function RootLayout({

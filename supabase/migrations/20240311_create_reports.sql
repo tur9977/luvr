@@ -20,7 +20,13 @@ create table if not exists public.reports (
 -- Add RLS policies
 alter table public.reports enable row level security;
 
-create policy "Reports are viewable by admins only"
+-- 允許所有用戶查看自己的檢舉
+create policy "Users can view their own reports"
+  on public.reports for select
+  using (auth.uid() = reporter_id);
+
+-- 允許管理員查看所有檢舉
+create policy "Admins can view all reports"
   on public.reports for select
   using (
     exists (
@@ -29,12 +35,14 @@ create policy "Reports are viewable by admins only"
     )
   );
 
+-- 允許用戶創建檢舉
 create policy "Users can create reports"
   on public.reports for insert
   with check (
     auth.uid() = reporter_id
   );
 
+-- 只允許管理員更新檢舉狀態
 create policy "Only admins can update reports"
   on public.reports for update
   using (
@@ -50,10 +58,14 @@ returns trigger as $$
 begin
     if new.status in ('approved', 'rejected') and old.status = 'pending' then
         new.resolved_at = now();
+        new.resolved_by = auth.uid();
     end if;
     return new;
 end;
 $$ language plpgsql;
+
+-- 刪除已存在的觸發器（如果存在）
+drop trigger if exists update_report_resolved_at on public.reports;
 
 -- 創建觸發器
 create trigger update_report_resolved_at

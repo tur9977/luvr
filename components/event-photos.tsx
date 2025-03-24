@@ -393,6 +393,7 @@ export function EventPhotos({ eventId, photos: initialPhotos }: EventPhotosProps
                   src={photo.photo_url}
                   alt={photo.caption || "活動照片"}
                   fill
+                  priority={true}
                   className="object-cover transition-transform group-hover:scale-110"
                 />
                 {photo.caption && (

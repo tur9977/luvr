@@ -5,6 +5,10 @@ export type Profile = Database['public']['Tables']['profiles']['Row'] & {
   posts?: { count: number } | null
   reports?: { count: number } | null
   role?: 'admin' | 'user'
+  full_name?: string | null
+  location?: string | null
+  bio?: string | null
+  email?: string | null
 }
 
 export type AdminRole = 'super_admin' | 'admin' | 'moderator'

@@ -61,13 +61,29 @@ export function PostHeader({ post }: PostHeaderProps) {
 
   const handleDelete = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        toast.error("請先登入")
+        return
+      }
+
+      // 檢查是否有權限刪除貼文
+      if (user.id !== post.user_id) {
+        toast.error("您沒有權限刪除這則貼文")
+        return
+      }
+
       const { error } = await supabase
         .from('posts')
         .delete()
         .eq('id', post.id)
-        .eq('user_id', profile?.id)
+        .eq('user_id', user.id)
 
-      if (error) throw error
+      if (error) {
+        console.error('刪除貼文時出錯:', error)
+        toast.error('刪除貼文失敗')
+        return
+      }
 
       toast.success('已刪除貼文')
       router.refresh()
@@ -143,7 +159,10 @@ export function PostHeader({ post }: PostHeaderProps) {
         <div className="flex items-center gap-3">
           <Link href={`/profile/${post.user_id}`} className="hover:opacity-75">
             <Avatar>
-              <AvatarImage src={post.profiles.avatar_url || '/placeholder.svg'} />
+              <AvatarImage 
+                src={post.profiles.avatar_url || '/placeholder.svg'} 
+                className="w-full h-full object-cover"
+              />
               <AvatarFallback>
                 {post.profiles.username?.charAt(0).toUpperCase()}
               </AvatarFallback>

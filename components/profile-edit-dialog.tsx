@@ -93,7 +93,11 @@ export function ProfileEditDialog() {
               ) : profile?.avatar_url ? (
                 <div className="flex flex-col items-center gap-2">
                   <Avatar className="w-20 h-20">
-                    <AvatarImage src={profile.avatar_url} alt="頭像" />
+                    <AvatarImage 
+                      src={profile.avatar_url} 
+                      alt="頭像"
+                      className="w-full h-full object-cover"
+                    />
                     <AvatarFallback>{profile.full_name?.[0] || "U"}</AvatarFallback>
                   </Avatar>
                   <p className="text-sm text-muted-foreground">點擊或拖曳更換頭像</p>

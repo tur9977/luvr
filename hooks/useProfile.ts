@@ -18,6 +18,7 @@ export function useProfile() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
 
   const createProfile = async (userId: string, email: string) => {
     try {
@@ -38,69 +39,85 @@ export function useProfile() {
         .single()
 
       if (error) {
-        console.error('Error creating profile:', error)
+        console.error('創建個人資料時發生錯誤:', error)
         throw error
       }
 
       return data
     } catch (error) {
-      console.error('Error in createProfile:', error)
+      console.error('createProfile 函數發生錯誤:', error)
       throw error
     }
   }
 
   const getCachedProfile = () => {
-    const cached = localStorage.getItem('userProfile')
-    if (!cached) return null
+    try {
+      const cached = localStorage.getItem('userProfile')
+      if (!cached) return null
 
-    const { profile, timestamp }: CachedProfile = JSON.parse(cached)
-    const now = Date.now()
+      const { profile, timestamp }: CachedProfile = JSON.parse(cached)
+      const now = Date.now()
 
-    // 檢查緩存是否過期
-    if (now - timestamp > CACHE_EXPIRY) {
+      // 檢查緩存是否過期
+      if (now - timestamp > CACHE_EXPIRY) {
+        localStorage.removeItem('userProfile')
+        return null
+      }
+
+      return profile
+    } catch (error) {
+      console.error('讀取緩存個人資料時發生錯誤:', error)
       localStorage.removeItem('userProfile')
       return null
     }
-
-    return profile
   }
 
   const setCachedProfile = (profile: Profile) => {
-    const cacheData: CachedProfile = {
-      profile,
-      timestamp: Date.now()
+    try {
+      const cacheData: CachedProfile = {
+        profile,
+        timestamp: Date.now()
+      }
+      localStorage.setItem('userProfile', JSON.stringify(cacheData))
+    } catch (error) {
+      console.error('儲存緩存個人資料時發生錯誤:', error)
+      localStorage.removeItem('userProfile')
     }
-    localStorage.setItem('userProfile', JSON.stringify(cacheData))
   }
 
   const fetchProfile = useCallback(async (force = false) => {
     try {
+      setError(null)
       // 如果不是強制更新，先嘗試使用緩存
       if (!force) {
         const cachedProfile = getCachedProfile()
         if (cachedProfile) {
-          console.log('Using cached profile')
+          console.log('使用緩存的個人資料')
           setProfile(cachedProfile)
           setLoading(false)
           return
         }
       }
 
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-      if (authError) {
-        console.error('Auth error:', authError)
+      // 先檢查認證會話
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError) {
+        console.error('認證會話錯誤:', sessionError)
+        setError(sessionError)
         setProfile(null)
         return
       }
 
-      if (!user) {
-        console.log('No user found')
+      if (!session) {
+        console.log('未找到認證會話')
         setProfile(null)
         return
       }
 
-      console.log('Fetching profile for user:', user.id)
+      const user = session.user
+      console.log('正在獲取用戶資料:', user.id)
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -108,24 +125,26 @@ export function useProfile() {
         .maybeSingle()
 
       if (error) {
-        console.error('Profile error:', error)
+        console.error('獲取個人資料時發生錯誤:', error)
+        setError(error)
         setProfile(null)
         return
       }
 
       if (!data) {
-        console.log('No profile found for user, creating new profile')
+        console.log('未找到個人資料，正在創建新資料')
         const newProfile = await createProfile(user.id, user.email || '')
         setProfile(newProfile)
         setCachedProfile(newProfile)
         return
       }
 
-      console.log('Profile fetched successfully')
+      console.log('成功獲取個人資料')
       setProfile(data)
       setCachedProfile(data)
     } catch (error) {
-      console.error('Error fetching profile:', error)
+      console.error('獲取個人資料時發生錯誤:', error)
+      setError(error as Error)
       setProfile(null)
     } finally {
       setLoading(false)
@@ -138,14 +157,14 @@ export function useProfile() {
 
     // 監聽認證狀態變化
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event)
+      console.log('認證狀態變更:', event)
       
       if (event === 'SIGNED_IN') {
-        // 登入時強制更新配置文件
-        console.log('Fetching profile after sign in')
+        // 登入時強制更新個人資料
+        console.log('登入後重新獲取個人資料')
         await fetchProfile(true)
       } else if (event === 'SIGNED_OUT') {
-        console.log('Clearing profile after sign out')
+        console.log('登出後清除個人資料')
         localStorage.removeItem('userProfile')
         setProfile(null)
       }
@@ -159,21 +178,23 @@ export function useProfile() {
   const updateProfile = async (updates: Partial<Profile>) => {
     try {
       setUpdating(true)
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (!user) throw new Error('No user')
+      setError(null)
+      
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) throw new Error('未登入')
 
       const { error } = await supabase
         .from('profiles')
         .update(updates)
-        .eq('id', user.id)
+        .eq('id', session.user.id)
 
       if (error) throw error
       
-      // 更新後強制刷新配置文件
+      // 更新後強制刷新個人資料
       await fetchProfile(true)
     } catch (error) {
-      console.error('Error updating profile:', error)
+      console.error('更新個人資料時發生錯誤:', error)
+      setError(error as Error)
       throw error
     } finally {
       setUpdating(false)
@@ -183,12 +204,14 @@ export function useProfile() {
   const uploadAvatar = async (file: File) => {
     try {
       setUpdating(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("未登入")
+      setError(null)
+      
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) throw new Error("未登入")
 
       const processedFile = await processImageForAvatar(file)
       const fileExt = 'jpg'
-      const fileName = `${user.id}_${Date.now()}.${fileExt}`
+      const fileName = `${session.user.id}_${Date.now()}.${fileExt}`
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
@@ -215,7 +238,8 @@ export function useProfile() {
       await updateProfile({ avatar_url: fullUrl })
       toast.success("頭像已更新")
     } catch (error) {
-      console.error("Error uploading avatar:", error)
+      console.error("上傳頭像時發生錯誤:", error)
+      setError(error as Error)
       toast.error("上傳頭像失敗")
       throw error
     } finally {
@@ -227,6 +251,7 @@ export function useProfile() {
     profile,
     loading,
     updating,
+    error,
     updateProfile,
     uploadAvatar,
   }
