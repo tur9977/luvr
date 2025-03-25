@@ -12,6 +12,7 @@ import { FollowButton } from "@/components/FollowButton"
 import type { Database } from "@/lib/types/database.types"
 import type { Metadata } from "next"
 import dynamic from "next/dynamic"
+import { UserAvatar } from "@/components/ui/user-avatar"
 
 const MediaGallery = dynamic(() => import("@/components/MediaGallery"), {
   ssr: false,
@@ -202,16 +203,13 @@ export default async function ProfilePage({ params }: Props) {
   return (
     <main className="container max-w-2xl mx-auto p-4">
       <div className="flex flex-col items-center gap-6 py-8">
-        <Avatar className="h-32 w-32 overflow-hidden">
-          <AvatarImage 
-            src={profile.avatar_url || "/placeholder.svg"} 
-            alt={profile.username || "User avatar"}
-            className="object-cover"
-          />
-          <AvatarFallback>
-            {(profile.username || "U").charAt(0).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+        <UserAvatar 
+          username={profile.username}
+          avatarUrl={profile.avatar_url}
+          role={profile.role}
+          size="lg"
+          className="h-32 w-32"
+        />
         <div className="text-center">
           <h1 className="text-2xl font-bold">{profile.username || "未設置用戶名"}</h1>
           {profile.full_name && (

@@ -19,8 +19,9 @@ import { supabase } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ImageIcon, Loader2 } from "lucide-react"
-import type { Profile } from "@/lib/types/database.types"
+import type { Profile } from "@/lib/types/supabase"
 import Image from "next/image"
+import { UserAvatar } from "@/components/ui/user-avatar"
 
 interface ProfileSettingsDialogProps {
   profile: Profile
@@ -322,16 +323,13 @@ export function ProfileSettingsDialog({ profile, children }: ProfileSettingsDial
           <TabsContent value="profile" className="space-y-4 py-4">
             <div className="flex flex-col items-center gap-4">
               <div className="relative">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage
-                    src={avatarPreview || profile.avatar_url || "/placeholder.svg"}
-                    alt={`${profile.username || 'User'}'s avatar`}
-                    className="h-24 w-24 object-cover"
-                  />
-                  <AvatarFallback>
-                    {(profile.username || "U").charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar 
+                  username={profile.username}
+                  avatarUrl={avatarPreview || profile.avatar_url}
+                  role={profile.role}
+                  size="lg"
+                  className="h-24 w-24"
+                />
                 <label
                   htmlFor="avatar-upload"
                   className="absolute bottom-0 right-0 p-1 rounded-full bg-background border cursor-pointer"
@@ -421,9 +419,9 @@ export function ProfileSettingsDialog({ profile, children }: ProfileSettingsDial
             <div className="space-y-4">
               <div className="grid gap-2">
                 <Label>電子郵件</Label>
-                <p className="text-sm text-muted-foreground border rounded-md p-2">
-                  {userEmail || "未設置郵箱"}
-                </p>
+                <div className="flex items-center gap-2 border rounded-md p-2">
+                  <p className="text-sm flex-grow">{userEmail || "未設置郵箱"}</p>
+                </div>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="current-password">目前密碼</Label>
@@ -478,7 +476,7 @@ export function ProfileSettingsDialog({ profile, children }: ProfileSettingsDial
                     更新中...
                   </>
                 ) : (
-                  "更新資料"
+                  "更新密碼"
                 )}
               </Button>
             </div>

@@ -8,6 +8,7 @@ import { CalendarDays, Heart, Loader2, MapPin, MessageCircle, Users2 } from "luc
 import Image from "next/image"
 import { ProfileEditDialog } from "@/components/profile-edit-dialog"
 import { useProfile } from "@/hooks/useProfile"
+import { UserAvatar } from "@/components/ui/user-avatar"
 
 export default function ProfilePage() {
   const { profile, loading } = useProfile()
@@ -33,14 +34,13 @@ export default function ProfilePage() {
     <main className="container max-w-2xl mx-auto p-4 pt-8">
       {/* 個人資料卡片 */}
       <div className="flex flex-col items-center text-center mb-8">
-        <Avatar className="w-32 h-32 border-4 border-background shadow-xl mb-4">
-          <AvatarImage 
-            src={profile.avatar_url || "/placeholder.svg"} 
-            alt="Profile picture"
-            className="w-full h-full object-cover"
-          />
-          <AvatarFallback className="text-4xl">{profile.full_name?.[0] || profile.username?.[0] || "U"}</AvatarFallback>
-        </Avatar>
+        <UserAvatar 
+          username={profile.username}
+          avatarUrl={profile.avatar_url}
+          role={profile.role}
+          size="lg"
+          className="border-4 border-background shadow-xl mb-4"
+        />
 
         <div className="space-y-2 mb-4">
           <h1 className="text-2xl font-bold">{profile.full_name || profile.username || "未設定名稱"}</h1>

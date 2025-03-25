@@ -17,12 +17,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { MoreHorizontal } from "lucide-react"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
 import { zhTW } from "date-fns/locale"
-import type { Profile } from "@/lib/types/profiles"
+import type { Profile, UserRole } from "@/lib/types/profiles"
 import type { Database } from "@/lib/types/database.types"
 
 interface UserTableProps {
@@ -33,7 +33,7 @@ export function UserTable({ users: initialUsers }: UserTableProps) {
   const [users, setUsers] = useState(initialUsers)
   const supabase = createClientComponentClient<Database>()
 
-  const handleRoleChange = async (userId: string, newRole: 'admin' | 'user') => {
+  const handleRoleChange = async (userId: string, newRole: UserRole) => {
     try {
       const { error } = await supabase
         .rpc('admin_update_user_role', {
@@ -49,10 +49,44 @@ export function UserTable({ users: initialUsers }: UserTableProps) {
           : user
       ))
       
-      toast.success(`已將用戶角色更改為${newRole === 'admin' ? '管理員' : '一般用戶'}`)
+      const roleLabels: Record<UserRole, string> = {
+        normal_user: '一般用戶',
+        banned_user: '禁封用戶',
+        verified_user: '認證用戶',
+        brand_user: '品牌用戶',
+        admin: '管理員'
+      }
+      
+      toast.success(`已將用戶角色更改為${roleLabels[newRole]}`)
     } catch (error) {
       console.error('更改角色時出錯:', error)
       toast.error('更改角色失敗')
+    }
+  }
+
+  const getRoleLabel = (role: UserRole) => {
+    const roleLabels: Record<UserRole, string> = {
+      normal_user: '一般用戶',
+      banned_user: '禁封用戶',
+      verified_user: '認證用戶',
+      brand_user: '品牌用戶',
+      admin: '管理員'
+    }
+    return roleLabels[role] || '一般用戶'
+  }
+
+  const getRoleStyle = (role: UserRole) => {
+    switch (role) {
+      case 'admin':
+        return 'text-primary font-medium'
+      case 'banned_user':
+        return 'text-destructive font-medium'
+      case 'verified_user':
+        return 'text-blue-500 font-medium'
+      case 'brand_user':
+        return 'text-yellow-600 font-medium'
+      default:
+        return ''
     }
   }
 
@@ -82,20 +116,19 @@ export function UserTable({ users: initialUsers }: UserTableProps) {
             <TableRow key={user.id}>
               <TableCell>
                 <div className="flex items-center gap-3">
-                  <Avatar>
-                    <AvatarImage src={user.avatar_url || '/placeholder.svg'} />
-                    <AvatarFallback>
-                      {user.username?.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    username={user.username}
+                    avatarUrl={user.avatar_url}
+                    role={user.role}
+                  />
                   <div className="font-medium">
                     {user.username}
                   </div>
                 </div>
               </TableCell>
               <TableCell>
-                <span className={user.role === 'admin' ? 'text-primary font-medium' : ''}>
-                  {user.role === 'admin' ? '管理員' : '一般用戶'}
+                <span className={getRoleStyle(user.role as UserRole)}>
+                  {getRoleLabel(user.role as UserRole)}
                 </span>
               </TableCell>
               <TableCell>{user.posts?.count || 0}</TableCell>
@@ -115,17 +148,32 @@ export function UserTable({ users: initialUsers }: UserTableProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {user.role === 'user' ? (
-                      <DropdownMenuItem
-                        onClick={() => handleRoleChange(user.id, 'admin')}
-                      >
+                    {user.role !== 'admin' && (
+                      <DropdownMenuItem onClick={() => handleRoleChange(user.id, 'admin')}>
                         設為管理員
                       </DropdownMenuItem>
-                    ) : (
-                      <DropdownMenuItem
-                        onClick={() => handleRoleChange(user.id, 'user')}
+                    )}
+                    {user.role !== 'normal_user' && (
+                      <DropdownMenuItem onClick={() => handleRoleChange(user.id, 'normal_user')}>
+                        設為一般用戶
+                      </DropdownMenuItem>
+                    )}
+                    {user.role !== 'verified_user' && (
+                      <DropdownMenuItem onClick={() => handleRoleChange(user.id, 'verified_user')}>
+                        設為認證用戶
+                      </DropdownMenuItem>
+                    )}
+                    {user.role !== 'brand_user' && (
+                      <DropdownMenuItem onClick={() => handleRoleChange(user.id, 'brand_user')}>
+                        設為品牌用戶
+                      </DropdownMenuItem>
+                    )}
+                    {user.role !== 'banned_user' && (
+                      <DropdownMenuItem 
+                        onClick={() => handleRoleChange(user.id, 'banned_user')}
+                        className="text-destructive"
                       >
-                        取消管理員
+                        禁封用戶
                       </DropdownMenuItem>
                     )}
                   </DropdownMenuContent>

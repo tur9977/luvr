@@ -15,20 +15,41 @@ import Link from "next/link"
 import { ProfileSettingsDialog } from "./profile-settings-dialog"
 import { LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
+import { UserAvatar } from "@/components/ui/user-avatar"
 
 export function UserNav() {
   const { profile } = useProfile()
   const router = useRouter()
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
-    if (profile) {
-      console.log("User profile:", {
-        id: profile.id,
-        username: profile.username,
-        role: profile.role
-      })
+    const checkAdminStatus = async () => {
+      if (profile) {
+        console.log("Checking admin status for user:", {
+          id: profile.id,
+          username: profile.username,
+          role: profile.role
+        })
+
+        // 直接從數據庫檢查角色
+        const { data: dbProfile, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', profile.id)
+          .single()
+          
+        if (!error && dbProfile?.role === 'admin') {
+          console.log('User confirmed as admin')
+          setIsAdmin(true)
+        } else {
+          console.log('User is not admin:', { error, role: dbProfile?.role })
+          setIsAdmin(false)
+        }
+      }
     }
+
+    checkAdminStatus()
   }, [profile])
 
   if (!profile) return null
@@ -38,28 +59,23 @@ export function UserNav() {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
       
-      // 使用 window.location.href 進行頁面跳轉
-      window.location.href = "/auth/login"
+      // 使用完整頁面刷新
+      window.location.href = '/auth/login'
     } catch (error) {
       console.error("登出失敗:", error)
     }
   }
 
-  const isAdmin = profile.role === 'admin'
-  console.log("Is admin?", isAdmin)
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <Avatar className="h-8 w-8 overflow-hidden">
-            <AvatarImage 
-              src={profile.avatar_url || "/placeholder.svg"} 
-              alt={profile.username || ''} 
-              className="object-cover"
-            />
-            <AvatarFallback>{profile.username?.charAt(0).toUpperCase()}</AvatarFallback>
-          </Avatar>
+          <UserAvatar 
+            username={profile.username}
+            avatarUrl={profile.avatar_url}
+            role={profile.role}
+            size="sm"
+          />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
@@ -95,16 +111,15 @@ export function UserNav() {
         {isAdmin && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push('/admin')}>
-              後台管理
+            <DropdownMenuItem asChild>
+              <Link href="/admin" className="cursor-pointer">
+                後台管理
+              </Link>
             </DropdownMenuItem>
           </>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="text-red-600 focus:text-red-600 focus:bg-red-100"
-          onClick={handleSignOut}
-        >
+        <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
           <LogOut className="mr-2 h-4 w-4" />
           登出
         </DropdownMenuItem>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
+  const [cooldown, setCooldown] = useState(0)
   const [loginData, setLoginData] = useState({
     email: "",
     password: "",
@@ -24,19 +25,62 @@ export default function LoginPage() {
     email: "",
   })
 
+  // 處理冷卻時間
+  useEffect(() => {
+    let timer: NodeJS.Timeout
+    if (cooldown > 0) {
+      timer = setInterval(() => {
+        setCooldown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer)
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+    }
+    return () => {
+      if (timer) clearInterval(timer)
+    }
+  }, [cooldown])
+
   // 處理登入
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // 如果在冷卻時間內，不允許提交
+    if (cooldown > 0) {
+      toast.error(`請等待 ${cooldown} 秒後再試一次`)
+      return
+    }
+
+    // 檢查輸入是否為空
+    if (!loginData.email || !loginData.password) {
+      toast.error("請填寫完整的登入資訊")
+      return
+    }
+
     setIsLoading(true)
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // 先檢查是否已經有活動的會話
+      const { data: { session: existingSession } } = await supabase.auth.getSession()
+      
+      // 如果有現有會話，先登出
+      if (existingSession) {
+        await supabase.auth.signOut()
+        // 等待一小段時間確保登出完成
+        await new Promise(resolve => setTimeout(resolve, 1000))
+      }
+
+      // 嘗試登入
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: loginData.email,
         password: loginData.password,
       })
 
-      if (error) {
-        if (error.message.includes("Email not confirmed")) {
+      if (authError) {
+        if (authError.message.includes("Email not confirmed")) {
           toast.error("請先驗證您的電子郵件地址", {
             action: {
               label: "重新發送驗證信",
@@ -45,12 +89,52 @@ export default function LoginPage() {
           })
           return
         }
-        throw error
+        if (authError.message.includes("Invalid login credentials")) {
+          toast.error("電子郵件或密碼錯誤")
+          return
+        }
+        if (authError.message.includes("Too Many Requests") || authError.message.includes("Request rate limit reached")) {
+          // 從錯誤消息中提取等待時間，如果無法提取則默認為 60 秒
+          const waitTimeMatch = authError.message.match(/\d+/)
+          const waitTime = waitTimeMatch ? parseInt(waitTimeMatch[0]) : 60
+          setCooldown(waitTime)
+          
+          toast.error(`登入請求過於頻繁`, {
+            description: `請等待 ${waitTime} 秒後再試。\n\n如果您沒有頻繁登入但仍看到此消息，可能是因為：\n1. 您的網絡連接不穩定\n2. 系統正在維護中\n3. 您的 IP 地址被暫時限制`,
+            duration: waitTime * 1000,
+          })
+          return
+        }
+        throw authError
+      }
+
+      if (!authData.user) {
+        throw new Error("登入失敗：無法獲取用戶資訊")
+      }
+
+      // 使用新的會話檢查用戶角色
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', authData.user.id)
+        .single()
+
+      if (profileError) {
+        console.error('檢查用戶角色失敗:', profileError)
+        if (profileError.message.includes('No authorization')) {
+          toast.error("登入過期，請重新登入")
+          return
+        }
+      } else {
+        console.log('用戶角色:', profile?.role)
+        // 將用戶角色存儲在 localStorage 中
+        localStorage.setItem('userRole', profile?.role || 'normal_user')
       }
 
       toast.success("登入成功！")
-      // 先刷新頁面，再跳轉
-      window.location.href = "/"
+      
+      // 使用 window.location.href 進行完整頁面刷新
+      window.location.href = '/'
     } catch (error) {
       console.error("Login error:", error)
       toast.error("登入失敗：" + (error as Error).message)
@@ -130,6 +214,7 @@ export default function LoginPage() {
                     value={loginData.email}
                     onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
                     required
+                    disabled={cooldown > 0}
                   />
                 </div>
                 <div className="space-y-2">
@@ -142,6 +227,7 @@ export default function LoginPage() {
                       value={loginData.password}
                       onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
                       required
+                      disabled={cooldown > 0}
                     />
                     <Button
                       type="button"
@@ -151,17 +237,26 @@ export default function LoginPage() {
                       onClick={() => setShowPassword(!showPassword)}
                       aria-label={showPassword ? "隱藏密碼" : "顯示密碼"}
                       title={showPassword ? "隱藏密碼" : "顯示密碼"}
+                      disabled={cooldown > 0}
                     >
                       {showPassword ? <EyeOffIcon className="h-4 w-4" aria-hidden="true" /> : <EyeIcon className="h-4 w-4" aria-hidden="true" />}
                     </Button>
                   </div>
                 </div>
-                <Button type="submit" variant="purple" className="w-full" disabled={isLoading} aria-label="登入">
+                <Button 
+                  type="submit" 
+                  variant="purple" 
+                  className="w-full" 
+                  disabled={isLoading || cooldown > 0} 
+                  aria-label="登入"
+                >
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                       登入中...
                     </>
+                  ) : cooldown > 0 ? (
+                    `請等待 ${cooldown} 秒`
                   ) : (
                     "登入"
                   )}

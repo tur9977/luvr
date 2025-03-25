@@ -2,55 +2,67 @@ import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 import { UserTable } from "../components/UserTable"
 import type { Profile } from "@/lib/types/profiles"
+import { Database } from "@/lib/types/supabase"
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-interface UserData {
-  id: string
-  username: string | null
-  full_name: string | null
-  avatar_url: string | null
-  email: string | null
-  created_at: string
+interface UserData extends Profile {
   post_count: number
   report_count: number
-  role: 'admin' | 'user'
 }
 
-async function getUsers() {
-  const supabase = createServerComponentClient({ cookies })
-  
-  console.log('Fetching users...')
-  const { data: users, error } = await supabase
-    .rpc('get_users_with_post_counts')
+interface CountResult {
+  user_id: string
+  count: number
+}
 
-  if (error) {
-    console.error('Error fetching users:', error)
+async function getUsers(): Promise<UserData[]> {
+  const supabase = createServerComponentClient<Database>({ cookies })
+  
+  // 首先獲取所有用戶
+  const { data: users, error: usersError } = await supabase
+    .from('profiles')
+    .select(`
+      *
+    `)
+    .order('created_at', { ascending: false })
+
+  if (usersError) {
+    console.error('Error fetching users:', usersError)
     return []
   }
 
-  // 添加調試日誌
-  (users as UserData[])?.forEach(user => {
-    console.log(`User ${user.username} has ${user.post_count || 0} posts`)
+  // 然後獲取每個用戶的貼文數量
+  const { data: postCounts, error: postsError } = await supabase
+    .rpc('count_user_posts') as { data: CountResult[] | null, error: any }
+
+  if (postsError) {
+    console.error('Error fetching post counts:', postsError)
+  }
+
+  // 獲取每個用戶的檢舉數量
+  const { data: reportCounts, error: reportsError } = await supabase
+    .rpc('count_user_reports') as { data: CountResult[] | null, error: any }
+
+  if (reportsError) {
+    console.error('Error fetching report counts:', reportsError)
+  }
+
+  // 將數據組合在一起
+  const userData = users.map(user => {
+    const userPosts = postCounts?.find((p: CountResult) => p.user_id === user.id)
+    const userReports = reportCounts?.find((r: CountResult) => r.user_id === user.id)
+    
+    return {
+      ...user,
+      post_count: userPosts?.count || 0,
+      report_count: userReports?.count || 0
+    }
   })
 
-  console.log('Users fetched:', users?.length || 0)
-  return (users as UserData[])?.map(user => ({
-    id: user.id,
-    username: user.username,
-    full_name: user.full_name,
-    avatar_url: user.avatar_url,
-    email: user.email,
-    created_at: user.created_at,
-    updated_at: user.created_at, // 使用 created_at 作為 updated_at
-    bio: null,
-    location: null,
-    notification_preferences: null,
-    posts: { count: user.post_count },
-    reports: { count: user.report_count },
-    role: user.role
-  } as Profile)) || []
+  console.log('Users data prepared:', userData.length)
+  return userData
 }
 
 export default async function UsersPage() {

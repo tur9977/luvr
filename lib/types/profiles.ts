@@ -1,10 +1,13 @@
 import type { Database } from './database.types'
 
+// 定義用戶角色類型
+export type UserRole = 'normal_user' | 'banned_user' | 'verified_user' | 'brand_user' | 'admin'
+
 // 从数据库类型中提取Profile类型
 export type Profile = Database['public']['Tables']['profiles']['Row'] & {
   posts?: { count: number } | null
   reports?: { count: number } | null
-  role?: 'admin' | 'user'
+  role?: UserRole
   full_name?: string | null
   location?: string | null
   bio?: string | null

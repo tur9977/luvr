@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ImageIcon, Loader2, PenSquare } from "lucide-react"
 import { useProfile } from "@/hooks/useProfile"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 
 export function ProfileEditDialog() {
   const { profile, updating, updateProfile, uploadAvatar } = useProfile()
@@ -92,14 +92,13 @@ export function ProfileEditDialog() {
                 </div>
               ) : profile?.avatar_url ? (
                 <div className="flex flex-col items-center gap-2">
-                  <Avatar className="w-20 h-20">
-                    <AvatarImage 
-                      src={profile.avatar_url} 
-                      alt="頭像"
-                      className="w-full h-full object-cover"
-                    />
-                    <AvatarFallback>{profile.full_name?.[0] || "U"}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar 
+                    username={profile.username}
+                    avatarUrl={profile.avatar_url}
+                    role={profile.role}
+                    size="lg"
+                    className="w-20 h-20"
+                  />
                   <p className="text-sm text-muted-foreground">點擊或拖曳更換頭像</p>
                 </div>
               ) : (
