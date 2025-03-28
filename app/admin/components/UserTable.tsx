@@ -35,13 +35,19 @@ export function UserTable({ users: initialUsers }: UserTableProps) {
 
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
     try {
-      const { error } = await supabase
-        .rpc('admin_update_user_role', {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('未登入')
+
+      const { data, error } = await supabase
+        .rpc('admin_role', {
+          admin_id: user.id,
           target_user_id: userId,
-          new_role: newRole
+          new_role: newRole,
+          reason: '管理員更改用戶角色'
         })
 
       if (error) throw error
+      if (!data) throw new Error('更改角色失敗')
 
       setUsers(users.map(user => 
         user.id === userId 

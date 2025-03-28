@@ -149,7 +149,10 @@ export default async function ProfilePage({ params }: Props) {
           aspect_ratio,
           duration,
           order
-        )
+        ),
+        likes(count),
+        comments(count),
+        shares(count)
       )
     `)
     .eq("user_id", params.id)
@@ -167,38 +170,12 @@ export default async function ProfilePage({ params }: Props) {
       },
       has_liked: true,
       _count: {
-        likes: 0, // 需要單獨獲取
-        comments: 0,
-        shares: 0
+        likes: post.likes?.[0]?.count || 0,
+        comments: post.comments?.[0]?.count || 0,
+        shares: post.shares?.[0]?.count || 0
       }
     }
   }) || []
-
-  // 獲取按讚貼文的統計數據
-  if (formattedLikedPosts.length > 0) {
-    const postIds = formattedLikedPosts.map(post => post.id)
-    const [likesData, commentsData, sharesData] = await Promise.all([
-      supabase
-        .from("likes")
-        .select("post_id", { count: "exact" })
-        .in("post_id", postIds),
-      supabase
-        .from("comments")
-        .select("post_id", { count: "exact" })
-        .in("post_id", postIds),
-      supabase
-        .from("shares")
-        .select("post_id", { count: "exact" })
-        .in("post_id", postIds)
-    ])
-
-    // 更新統計數據
-    formattedLikedPosts.forEach(post => {
-      post._count.likes = likesData.count || 0
-      post._count.comments = commentsData.count || 0
-      post._count.shares = sharesData.count || 0
-    })
-  }
 
   return (
     <main className="container max-w-2xl mx-auto p-4">
