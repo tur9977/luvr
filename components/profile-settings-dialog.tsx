@@ -46,16 +46,27 @@ export function ProfileSettingsDialog({ profile, children }: ProfileSettingsDial
     confirmPassword: "",
   })
 
+  // 當對話框打開時獲取用戶郵箱
   useEffect(() => {
-    // 獲取當前用戶的 email
-    const getCurrentUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user?.email) {
-        setUserEmail(user.email)
+    if (isOpen) {
+      const getCurrentUser = async () => {
+        try {
+          const { data: { user }, error } = await supabase.auth.getUser()
+          if (error) {
+            console.error("獲取用戶信息失敗:", error)
+            return
+          }
+          if (user?.email) {
+            console.log("獲取到用戶郵箱:", user.email)
+            setUserEmail(user.email)
+          }
+        } catch (error) {
+          console.error("獲取用戶信息時出錯:", error)
+        }
       }
+      getCurrentUser()
     }
-    getCurrentUser()
-  }, [])
+  }, [isOpen])
 
   // 處理頭像上傳
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -420,7 +431,9 @@ export function ProfileSettingsDialog({ profile, children }: ProfileSettingsDial
               <div className="grid gap-2">
                 <Label>電子郵件</Label>
                 <div className="flex items-center gap-2 border rounded-md p-2">
-                  <p className="text-sm flex-grow">{userEmail || "未設置郵箱"}</p>
+                  <p className="text-sm flex-grow font-medium">
+                    {userEmail || "未設置郵箱"}
+                  </p>
                 </div>
               </div>
               <div className="grid gap-2">
