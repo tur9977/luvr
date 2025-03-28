@@ -1,29 +1,23 @@
-import type { Metadata } from "next"
+"use client"
+
 import { Inter } from "next/font/google"
-import "./globals.css"
-import { SiteHeader } from "@/components/site-header"
-import { Toaster } from "sonner"
+import { Toaster } from "@/components/ui/toaster"
 import { ThemeProvider } from "@/components/theme-provider"
+import { SiteHeader } from "@/components/site-header"
+import { useProfile } from "@/hooks/useProfile"
+import { BannedUserOverlay } from "@/components/BannedUserOverlay"
+import "./globals.css"
 
 const inter = Inter({ subsets: ["latin"] })
-
-export const metadata: Metadata = {
-  title: "Luvr - LGBTQ+ 社交平台",
-  description: "一個專為 LGBTQ+ 社群打造的社交平台",
-  icons: {
-    icon: [
-      { url: '/favicon.ico', sizes: 'any' },
-      { url: '/icon.png', type: 'image/png' }
-    ],
-    shortcut: '/favicon.ico'
-  }
-}
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const { profile } = useProfile()
+  const isBanned = profile?.role === "banned_user"
+
   return (
     <html lang="zh-TW" suppressHydrationWarning>
       <body className={`${inter.className} min-h-screen bg-background antialiased`}>
@@ -33,11 +27,15 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="relative flex min-h-screen flex-col">
-            <SiteHeader />
-            <main className="flex-1">{children}</main>
-          </div>
-          <Toaster richColors position="top-center" />
+          {isBanned ? (
+            <BannedUserOverlay />
+          ) : (
+            <div className="relative flex min-h-screen flex-col">
+              <SiteHeader />
+              <main className="flex-1">{children}</main>
+            </div>
+          )}
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>
