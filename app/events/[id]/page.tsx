@@ -599,9 +599,13 @@ export default function EventPage() {
           </span>
         </div>
         {profile && event?.user_id === profile.id && (
-          <Link href={`/events/${params.id}/edit`}>
-            <Button>編輯活動</Button>
-          </Link>
+          <Button
+            onClick={() => {
+              router.push(`/events/${params.id}/edit`)
+            }}
+          >
+            編輯活動
+          </Button>
         )}
       </div>
     </main>

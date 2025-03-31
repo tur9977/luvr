@@ -89,10 +89,12 @@ export function useProfile() {
   const fetchProfile = useCallback(async (force = false) => {
     try {
       setError(null)
+      
       // 如果不是強制更新，先嘗試使用緩存
       if (!force) {
         const cachedProfile = getCachedProfile()
         if (cachedProfile) {
+          console.log('Using cached profile:', cachedProfile)
           setProfile(cachedProfile)
           setLoading(false)
           return
@@ -105,43 +107,42 @@ export function useProfile() {
       if (sessionError) {
         console.error('認證會話錯誤:', sessionError)
         setError(sessionError)
-        setProfile(null)
         return
       }
 
-      if (!session) {
-        setProfile(null)
+      if (!session?.user) {
+        console.log('No session or user found')
         return
       }
 
-      const user = session.user
+      console.log('Fetching profile for user:', session.user.id)
       
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', user.id)
+        .eq('id', session.user.id)
         .maybeSingle()
 
       if (error) {
         console.error('獲取個人資料時發生錯誤:', error)
         setError(error)
-        setProfile(null)
         return
       }
 
       if (!data) {
-        const newProfile = await createProfile(user.id, user.email || '')
+        console.log('No profile found, creating new one')
+        const newProfile = await createProfile(session.user.id, session.user.email || '')
         setProfile(newProfile)
         setCachedProfile(newProfile)
         return
       }
 
+      console.log('Profile found:', data)
       setProfile(data)
       setCachedProfile(data)
     } catch (error) {
       console.error('獲取個人資料時發生錯誤:', error)
       setError(error as Error)
-      setProfile(null)
     } finally {
       setLoading(false)
     }
@@ -155,7 +156,9 @@ export function useProfile() {
 
     // 監聽認證狀態變化
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN') {
+      console.log('Auth state changed:', event, !!session)
+      
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         await fetchProfile(true)
       } else if (event === 'SIGNED_OUT') {
         localStorage.removeItem('userProfile')

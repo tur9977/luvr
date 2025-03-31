@@ -48,8 +48,33 @@ export default function EditEventPage({ params }: { params: { id: string } }) {
   })
 
   useEffect(() => {
-    fetchEvent()
-  }, [params.id])
+    console.log('EditEventPage mounted, profile:', profile)
+    console.log('Params:', params)
+
+    const init = async () => {
+      if (!profile) {
+        console.log('No profile found, waiting...')
+        return
+      }
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        console.log('Current session:', session)
+        
+        if (!session) {
+          console.log('No session found, redirecting to login')
+          router.push('/auth/login')
+          return
+        }
+
+        fetchEvent()
+      } catch (error) {
+        console.error('Error in init:', error)
+      }
+    }
+
+    init()
+  }, [profile, params.id])
 
   useEffect(() => {
     if (event) {
@@ -64,16 +89,26 @@ export default function EditEventPage({ params }: { params: { id: string } }) {
   }, [event])
 
   const fetchEvent = async () => {
+    if (!profile) {
+      console.log('No profile in fetchEvent, skipping')
+      return
+    }
+
     try {
+      console.log('Fetching event:', params.id)
       const { data, error } = await supabase
         .from("events")
         .select("*")
         .eq("id", params.id)
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Error fetching event:', error)
+        throw error
+      }
 
       if (!data) {
+        console.log('No event found')
         toast({
           variant: "destructive",
           title: "錯誤",
@@ -83,18 +118,30 @@ export default function EditEventPage({ params }: { params: { id: string } }) {
         return
       }
 
-      // 檢查權限
-      if (data.user_id !== profile?.id) {
+      console.log('Event found:', data)
+      console.log('Current user:', profile.id)
+      console.log('Event creator:', data.user_id)
+
+      // 簡化的權限檢查
+      if (data.user_id !== profile.id) {
+        console.log('Permission denied')
         toast({
           variant: "destructive",
-          title: "錯誤",
-          description: "您沒有權限編輯此活動",
+          title: "無權限",
+          description: "只有活動創建者可以編輯",
         })
-        router.push("/events")
+        router.push(`/events/${params.id}`)
         return
       }
 
       setEvent(data)
+      setFormData({
+        title: data.title,
+        description: data.description || "",
+        location: data.location || "",
+        status: data.status,
+        max_participants: data.max_participants || 0,
+      })
     } catch (error) {
       console.error("Error fetching event:", error)
       toast({
@@ -102,6 +149,7 @@ export default function EditEventPage({ params }: { params: { id: string } }) {
         title: "錯誤",
         description: "無法載入活動資料",
       })
+      router.push("/events")
     } finally {
       setLoading(false)
     }
