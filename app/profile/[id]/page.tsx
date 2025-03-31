@@ -1,34 +1,13 @@
 import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 import { notFound } from "next/navigation"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Card } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import Image from "next/image"
-import { formatDistanceToNow } from "date-fns"
-import { zhTW } from "date-fns/locale"
-import { PostActions } from "@/components/PostActions"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { FollowButton } from "@/components/FollowButton"
 import type { Database } from "@/lib/types/database.types"
-import type { Metadata } from "next"
-import dynamic from "next/dynamic"
-import { UserAvatar } from "@/components/ui/user-avatar"
-
-const MediaGallery = dynamic(() => import("@/components/MediaGallery"), {
-  ssr: false,
-})
+import { ProfileContent } from "./profile-content"
 
 interface Props {
   params: { id: string }
-}
-
-interface PostMedia {
-  id: string
-  media_url: string
-  media_type: string
-  aspect_ratio: number
-  duration: number | null
-  order: number
 }
 
 export default async function ProfilePage({ params }: Props) {
@@ -53,7 +32,8 @@ export default async function ProfilePage({ params }: Props) {
       profiles!inner (
         id,
         username,
-        avatar_url
+        avatar_url,
+        role
       ),
       post_media (
         id,
@@ -71,7 +51,8 @@ export default async function ProfilePage({ params }: Props) {
         profiles(
           id,
           username,
-          avatar_url
+          avatar_url,
+          role
         )
       ),
       shares(count)
@@ -121,6 +102,7 @@ export default async function ProfilePage({ params }: Props) {
       id: string
       username: string | null
       avatar_url: string | null
+      role: string
     },
     has_liked: userLikes.includes(post.id),
     _count: {
@@ -140,7 +122,8 @@ export default async function ProfilePage({ params }: Props) {
         profiles!inner (
           id,
           username,
-          avatar_url
+          avatar_url,
+          role
         ),
         post_media (
           id,
@@ -151,7 +134,17 @@ export default async function ProfilePage({ params }: Props) {
           order
         ),
         likes(count),
-        comments(count),
+        comments(
+          id,
+          content,
+          created_at,
+          profiles(
+            id,
+            username,
+            avatar_url,
+            role
+          )
+        ),
         shares(count)
       )
     `)
@@ -167,11 +160,12 @@ export default async function ProfilePage({ params }: Props) {
         id: string
         username: string | null
         avatar_url: string | null
+        role: string
       },
       has_liked: true,
       _count: {
         likes: post.likes?.[0]?.count || 0,
-        comments: post.comments?.[0]?.count || 0,
+        comments: post.comments?.length || 0,
         shares: post.shares?.[0]?.count || 0
       }
     }
@@ -181,8 +175,8 @@ export default async function ProfilePage({ params }: Props) {
     <main className="container max-w-2xl mx-auto p-4">
       <div className="flex flex-col items-center gap-6 py-8">
         <UserAvatar 
-          username={profile.username}
-          avatarUrl={profile.avatar_url}
+          username={profile.username || ""}
+          avatarUrl={profile.avatar_url || ""}
           role={profile.role}
           size="lg"
           className="h-32 w-32"
@@ -198,138 +192,33 @@ export default async function ProfilePage({ params }: Props) {
           {profile.bio && (
             <p className="mt-4 max-w-md">{profile.bio}</p>
           )}
-          {user && user.id !== params.id && (
-            <div className="mt-4">
-              <FollowButton userId={params.id} initialIsFollowing={isFollowing} />
-            </div>
-          )}
         </div>
-        <div className="flex gap-8">
+        <div className="flex items-center gap-6">
           <div className="text-center">
             <p className="text-2xl font-bold">{formattedPosts.length}</p>
             <p className="text-sm text-muted-foreground">貼文</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold">{followersCount || 0}</p>
+            <p className="text-2xl font-bold">{followersCount}</p>
             <p className="text-sm text-muted-foreground">粉絲</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold">{followingCount || 0}</p>
+            <p className="text-2xl font-bold">{followingCount}</p>
             <p className="text-sm text-muted-foreground">追蹤中</p>
           </div>
         </div>
+        {user?.id !== params.id && (
+          <FollowButton
+            targetUserId={params.id}
+            isFollowing={isFollowing}
+          />
+        )}
       </div>
 
-      <Tabs defaultValue="posts" className="w-full mt-8">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="posts">貼文</TabsTrigger>
-          <TabsTrigger value="likes">按讚的貼文</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="posts" className="mt-6">
-          <div className="space-y-4">
-            {formattedPosts.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                還沒有任何貼文
-              </div>
-            ) : (
-              formattedPosts.map((post) => (
-                <Card key={post.id}>
-                  <div className="p-4">
-                    <div className="flex items-center gap-4">
-                      <Avatar>
-                        <AvatarImage src={post.profiles?.avatar_url || "/placeholder.svg"} />
-                        <AvatarFallback>
-                          {(post.profiles?.username || "U").charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-semibold">{post.profiles?.username || "未知用戶"}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDistanceToNow(new Date(post.created_at), {
-                            addSuffix: true,
-                            locale: zhTW,
-                          })}
-                          {post.location && ` · ${post.location}`}
-                        </p>
-                      </div>
-                    </div>
-                    {post.caption && (
-                      <p className="mt-4">{post.caption}</p>
-                    )}
-                  </div>
-                  {post.post_media && post.post_media.length > 0 && (
-                    <MediaGallery media={post.post_media} caption={post.caption} priority={formattedPosts.indexOf(post) === 0} />
-                  )}
-                  <div className="p-4">
-                    <PostActions
-                      postId={post.id}
-                      userId={post.user_id}
-                      initialLikesCount={post._count.likes}
-                      initialCommentsCount={post._count.comments}
-                      initialSharesCount={post._count.shares}
-                      isLiked={post.has_liked}
-                      initialComments={post.comments}
-                    />
-                  </div>
-                </Card>
-              ))
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="likes" className="mt-6">
-          <div className="space-y-4">
-            {formattedLikedPosts.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                還沒有按讚的貼文
-              </div>
-            ) : (
-              formattedLikedPosts.map((post) => (
-                <Card key={post.id}>
-                  <div className="p-4">
-                    <div className="flex items-center gap-4">
-                      <Avatar>
-                        <AvatarImage src={post.profiles?.avatar_url || "/placeholder.svg"} />
-                        <AvatarFallback>
-                          {(post.profiles?.username || "U").charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-semibold">{post.profiles?.username || "未知用戶"}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDistanceToNow(new Date(post.created_at), {
-                            addSuffix: true,
-                            locale: zhTW,
-                          })}
-                          {post.location && ` · ${post.location}`}
-                        </p>
-                      </div>
-                    </div>
-                    {post.caption && (
-                      <p className="mt-4">{post.caption}</p>
-                    )}
-                  </div>
-                  {post.post_media && post.post_media.length > 0 && (
-                    <MediaGallery media={post.post_media} caption={post.caption} priority={formattedLikedPosts.indexOf(post) === 0} />
-                  )}
-                  <div className="p-4">
-                    <PostActions
-                      postId={post.id}
-                      userId={post.user_id}
-                      initialLikesCount={post._count.likes}
-                      initialCommentsCount={post._count.comments}
-                      initialSharesCount={post._count.shares}
-                      isLiked={post.has_liked}
-                      initialComments={[]}
-                    />
-                  </div>
-                </Card>
-              ))
-            )}
-          </div>
-        </TabsContent>
-      </Tabs>
+      <ProfileContent 
+        posts={formattedPosts} 
+        likedPosts={formattedLikedPosts} 
+      />
     </main>
   )
 } 

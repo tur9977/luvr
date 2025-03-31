@@ -1,22 +1,27 @@
+"use client"
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { BadgeCheck, Crown, Shield, Star, User } from "lucide-react"
-import type { ProfileRole } from "@/lib/types/supabase"
+import { BadgeCheck, Crown, Shield, Star } from "lucide-react"
+import type { ProfileRole } from "@/lib/types/database.types"
 
 interface UserAvatarProps {
-  username?: string | null
-  avatarUrl?: string | null
-  role?: ProfileRole
+  username: string
+  avatarUrl: string | null
+  role: ProfileRole
   className?: string
   size?: "sm" | "md" | "lg"
+  showBadge?: boolean
 }
 
 export function UserAvatar({ 
   username, 
   avatarUrl, 
-  role,
-  className,
-  size = "md"
+  role = "user", 
+  className, 
+  size = "md",
+  showBadge = false 
 }: UserAvatarProps) {
   const sizeClasses = {
     sm: "h-8 w-8",
@@ -30,33 +35,43 @@ export function UserAvatar({
     lg: "h-5 w-5"
   }
 
-  const getBadgeIcon = (role?: ProfileRole) => {
+  const getBadgeIcon = (role: ProfileRole) => {
     switch (role) {
       case 'admin':
         return <Crown className={cn(badgeClasses[size], "text-purple-500")} />
-      case 'verified_user':
+      case 'user':
         return <BadgeCheck className={cn(badgeClasses[size], "text-blue-500")} />
-      case 'brand_user':
-        return <Star className={cn(badgeClasses[size], "text-yellow-500")} />
-      case 'banned_user':
+      case 'banned':
         return <Shield className={cn(badgeClasses[size], "text-red-500")} />
       default:
         return null
     }
   }
 
+  const badgeIcon = getBadgeIcon(role)
+
   return (
     <div className="relative inline-block">
       <Avatar className={cn(sizeClasses[size], className)}>
-        <AvatarImage src={avatarUrl || '/placeholder.svg'} alt={username || 'User avatar'} />
-        <AvatarFallback>
-          {username?.charAt(0).toUpperCase() || 'U'}
-        </AvatarFallback>
+        <AvatarImage 
+          src={avatarUrl || undefined} 
+          alt={username}
+          className="object-cover"
+        />
+        <AvatarFallback>{username[0]?.toUpperCase()}</AvatarFallback>
       </Avatar>
-      {role && role !== 'normal_user' && (
-        <div className="absolute -bottom-1 -right-1 rounded-full bg-white p-0.5 shadow-sm">
-          {getBadgeIcon(role)}
+      {badgeIcon && (
+        <div className="absolute -bottom-1 -right-1 rounded-full bg-background p-0.5">
+          {badgeIcon}
         </div>
+      )}
+      {showBadge && (role === 'admin' || role === 'banned') && (
+        <Badge 
+          variant={role === 'admin' ? "secondary" : "destructive"} 
+          className="absolute -top-2 -right-2 text-xs px-1 py-0"
+        >
+          {role === 'admin' ? '管理員' : '已封鎖'}
+        </Badge>
       )}
     </div>
   )

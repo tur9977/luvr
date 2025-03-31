@@ -15,6 +15,8 @@ import { Database } from "@/lib/types/database.types"
 import { useProfile } from "@/hooks/useProfile"
 import { useToast } from "@/components/ui/use-toast"
 import EventFilters, { EventFilters as EventFiltersType } from "@/components/event-filters"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { EventCard } from "@/components/events/EventCard"
 
 type Event = Database["public"]["Tables"]["events"]["Row"] & {
   profiles: {
@@ -41,6 +43,7 @@ export default function EventsPage() {
     startDate: null,
     endDate: null,
     eventType: "all",
+    status: "active",
   })
 
   // 保存应用的筛选器
@@ -138,6 +141,13 @@ export default function EventsPage() {
     if (appliedFilters.eventType && appliedFilters.eventType !== "all") {
       query = query.eq("event_type", appliedFilters.eventType)
     }
+
+    // 按活動狀態篩選
+    if (appliedFilters.status === "active") {
+      query = query.in("status", ["upcoming", "ongoing"])
+    } else if (appliedFilters.status === "completed") {
+      query = query.in("status", ["completed", "cancelled"])
+    }
     
     return query
   }
@@ -147,12 +157,13 @@ export default function EventsPage() {
   }
 
   const handleResetFilters = () => {
-    const resetFilters = {
+    const resetFilters: EventFiltersType = {
       search: "",
       location: "",
       startDate: null,
       endDate: null,
       eventType: "all",
+      status: "active",
     }
     setFilters(resetFilters)
     setAppliedFilters(resetFilters)
@@ -179,139 +190,77 @@ export default function EventsPage() {
     if (appliedFilters.startDate) count++
     if (appliedFilters.endDate) count++
     if (appliedFilters.eventType && appliedFilters.eventType !== "all") count++
+    if (appliedFilters.status) count++
     return count
   }
 
   const activeFiltersCount = getActiveFiltersCount()
 
   return (
-    <main className="container max-w-2xl mx-auto p-4 pt-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">活動列表</h1>
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            onClick={toggleFilters}
-            className="gap-2"
-          >
-            <Filter className="h-4 w-4" />
+    <div className="container mx-auto py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">活動列表</h1>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
+            <Filter className="w-4 h-4 mr-2" />
             篩選
-            {activeFiltersCount > 0 && (
-              <span className="ml-1 rounded-full bg-primary text-primary-foreground w-5 h-5 text-xs flex items-center justify-center">
-                {activeFiltersCount}
-              </span>
-            )}
           </Button>
           {profile && (
-            <Button asChild>
-              <Link href="/create?tab=event">建立活動</Link>
-            </Button>
+            <Link href="/events/create">
+              <Button>建立活動</Button>
+            </Link>
           )}
         </div>
       </div>
 
-      {/* 筛选面板 */}
-      <div className={`mb-6 overflow-hidden transition-all duration-300 ${showFilters ? 'max-h-[800px]' : 'max-h-0'}`}>
-        <div className="border rounded-md p-4 bg-card">
-          <EventFilters
-            filters={filters}
-            setFilters={setFilters}
-            onApplyFilters={handleApplyFilters}
-            onResetFilters={handleResetFilters}
-          />
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="grid gap-4">
-          {[...Array(3)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="h-48 bg-muted" />
+      <Tabs defaultValue="active" onValueChange={(value) => {
+        const status = value as "active" | "completed"
+        setFilters(prev => ({ ...prev, status }))
+        setAppliedFilters(prev => ({ ...prev, status }))
+      }}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="active">進行中</TabsTrigger>
+          <TabsTrigger value="completed">已結束</TabsTrigger>
+        </TabsList>
+        <TabsContent value="active">
+          {showFilters && (
+            <Card className="mb-6">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">篩選條件</h2>
+                  <Button variant="ghost" size="sm" onClick={handleResetFilters}>
+                    重置
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <EventFilters 
+                  filters={filters} 
+                  setFilters={setFilters}
+                  onApplyFilters={handleApplyFilters}
+                  onResetFilters={handleResetFilters}
+                />
+              </CardContent>
             </Card>
-          ))}
-        </div>
-      ) : events.length > 0 ? (
-        <div className="grid gap-4">
-          {events.map((event) => (
-            <Card key={event.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-              <Link href={`/events/${event.id}`} className="block">
-                {event.cover_url && (
-                  <div className="relative h-48 bg-muted">
-                    <Image
-                      src={event.cover_url}
-                      alt={event.title}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                )}
-                <CardHeader>
-                  <div className="space-y-1">
-                    <h2 className="text-xl font-semibold">{event.title}</h2>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <CalendarIcon className="h-4 w-4" />
-                      <time dateTime={event.date}>
-                        {format(new Date(event.date), "PPP", { locale: zhTW })}
-                      </time>
-                    </div>
-                    {event.location && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <MapPinIcon className="h-4 w-4" />
-                        <span>{event.location}</span>
-                      </div>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {event.description}
-                  </p>
-                </CardContent>
-                <CardFooter className="flex items-center justify-between text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    {event.profiles.avatar_url ? (
-                      <Image
-                        src={event.profiles.avatar_url}
-                        alt={event.profiles.username || ""}
-                        width={20}
-                        height={20}
-                        className="rounded-full"
-                      />
-                    ) : (
-                      <UserIcon className="h-5 w-5" />
-                    )}
-                    <span>{event.profiles.username || "未知用戶"}</span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span>{getParticipantCount(event, "going")} 人參加</span>
-                    <span>{getParticipantCount(event, "interested")} 人感興趣</span>
-                  </div>
-                </CardFooter>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {events.map((event) => (
+              <Link key={event.id} href={`/events/${event.id}`} className="block">
+                <EventCard event={event} />
               </Link>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          {activeFiltersCount > 0 ? (
-            <>
-              <p className="text-muted-foreground">沒有符合條件的活動</p>
-              <Button className="mt-4" variant="outline" onClick={handleResetFilters}>
-                清除篩選條件
-              </Button>
-            </>
-          ) : (
-            <>
-              <p className="text-muted-foreground">目前還沒有活動</p>
-              {profile && (
-                <Button className="mt-4" asChild>
-                  <Link href="/create?tab=event">建立第一個活動</Link>
-                </Button>
-              )}
-            </>
-          )}
-        </div>
-      )}
-    </main>
+            ))}
+          </div>
+        </TabsContent>
+        <TabsContent value="completed">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {events.map((event) => (
+              <Link key={event.id} href={`/events/${event.id}`} className="block">
+                <EventCard event={event} />
+              </Link>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
   )
 } 

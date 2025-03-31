@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button"
 import { PlusCircle, Calendar } from "lucide-react"
 import { UserNav } from "./user-nav"
 import { useProfile } from "@/hooks/useProfile"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
+import { useAuth } from "@/hooks/useAuth"
+import { cn } from "@/lib/utils"
 
 // Vibrant and joyful logo design
 const Logo = () => (
@@ -47,12 +49,14 @@ const Logo = () => (
 )
 
 export function SiteHeader() {
-  const { profile, loading } = useProfile()
+  const { user } = useAuth()
+  const { profile } = useProfile()
   const router = useRouter()
+  const pathname = usePathname()
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 max-w-2xl items-center">
+      <div className="container flex h-14 max-w-2xl items-center justify-between">
         <Link href="/" className="flex items-center gap-3">
           <div className="w-9 h-9 transform hover:rotate-180 transition-transform duration-500">
             <Logo />
@@ -67,48 +71,47 @@ export function SiteHeader() {
             LUVR
           </span>
         </Link>
+        
         <div className="flex items-center ml-auto gap-2">
-          {loading ? (
-            // 加載中顯示占位符
-            <div className="w-20 h-8 bg-muted animate-pulse rounded-md"></div>
+          {user && profile ? (
+            <>
+              <Link 
+                href="/events" 
+                aria-label="活動日曆"
+                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground h-9 w-9"
+              >
+                <Calendar className="h-5 w-5" aria-hidden="true" />
+              </Link>
+              <Link 
+                href="/create" 
+                aria-label="建立新內容"
+                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground h-9 w-9"
+              >
+                <PlusCircle className="h-5 w-5" aria-hidden="true" />
+              </Link>
+              <UserNav />
+            </>
           ) : (
             <>
-              {profile ? (
-                <>
-                  <Button variant="ghost" size="icon" asChild>
-                    <Link href="/events" aria-label="活動日曆">
-                      <Calendar className="h-5 w-5" aria-hidden="true" />
-                    </Link>
-                  </Button>
-                  <Button variant="ghost" size="icon" asChild>
-                    <Link href="/create" aria-label="建立新活動">
-                      <PlusCircle className="h-5 w-5" aria-hidden="true" />
-                    </Link>
-                  </Button>
-                  <UserNav />
-                </>
-              ) : (
-                <>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    asChild
-                  >
-                    <Link href="/auth/login" aria-label="登入">
-                      登入
-                    </Link>
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    className="bg-[#8A6FD4] hover:bg-[#7857C8]"
-                    asChild
-                  >
-                    <Link href="/auth/register" aria-label="註冊">
-                      註冊
-                    </Link>
-                  </Button>
-                </>
-              )}
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                asChild
+                className="mr-2"
+              >
+                <Link href="/auth/login" aria-label="登入">
+                  登入
+                </Link>
+              </Button>
+              <Button 
+                size="sm" 
+                className="bg-[#8A6FD4] hover:bg-[#7857C8]"
+                asChild
+              >
+                <Link href="/auth/register" aria-label="註冊">
+                  註冊
+                </Link>
+              </Button>
             </>
           )}
         </div>

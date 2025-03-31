@@ -15,7 +15,7 @@ type Event = Database["public"]["Tables"]["events"]["Row"] & {
     username: string | null
     avatar_url: string | null
   }
-  participants: {
+  event_participants: {
     status: string
     user_id: string
   }[]
@@ -32,6 +32,7 @@ export function EventList() {
 
   const fetchEvents = async () => {
     try {
+      // 首先獲取活動數據
       const { data: eventsData, error: eventsError } = await supabase
         .from("events")
         .select(`
@@ -46,24 +47,25 @@ export function EventList() {
 
       if (eventsError) throw eventsError
 
-      // 獲取每個活動的參與者
-      const eventsWithParticipants = await Promise.all(
-        eventsData.map(async (event) => {
-          const { data: participants, error: participantsError } = await supabase
-            .from("event_participants")
-            .select("status, user_id")
-            .eq("event_id", event.id)
+      // 然後獲取這些活動的參與者數據
+      if (eventsData && eventsData.length > 0) {
+        const { data: participantsData, error: participantsError } = await supabase
+          .from("event_participants")
+          .select("*")
+          .in("event_id", eventsData.map(event => event.id))
 
-          if (participantsError) {
-            console.error("Error fetching participants:", participantsError)
-            return { ...event, participants: [] }
-          }
+        if (participantsError) throw participantsError
 
-          return { ...event, participants: participants || [] }
-        })
-      )
+        // 將參與者數據合併到活動數據中
+        const eventsWithParticipants = eventsData.map(event => ({
+          ...event,
+          event_participants: participantsData?.filter(p => p.event_id === event.id) || []
+        }))
 
-      setEvents(eventsWithParticipants)
+        setEvents(eventsWithParticipants)
+      } else {
+        setEvents([])
+      }
     } catch (error) {
       console.error("Error fetching events:", error)
       toast({
@@ -77,7 +79,7 @@ export function EventList() {
   }
 
   const getParticipantCount = (event: Event, status: string) => {
-    return event.participants?.filter(p => p.status === status).length || 0
+    return event.event_participants?.filter(p => p.status === status).length || 0
   }
 
   if (loading) {
@@ -96,14 +98,7 @@ export function EventList() {
         <>
           {events.map((event) => (
             <Link key={event.id} href={`/events/${event.id}`}>
-              <EventCard
-                title={event.title}
-                date={format(new Date(event.date), "PPP", { locale: zhTW })}
-                description={event.description}
-                imageUrl={event.cover_url ?? "/placeholder.svg"}
-                participants={getParticipantCount(event, "going")}
-                interested={getParticipantCount(event, "interested")}
-              />
+              <EventCard event={event} />
             </Link>
           ))}
           <div className="flex justify-center">

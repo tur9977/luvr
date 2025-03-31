@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Heart, MessageCircle, Share2, MoreVertical, Trash2 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/lib/supabase/client"
-import { useUser } from "@/hooks/useUser"
+import { useAuth } from "@/hooks/useAuth"
 import {
   Dialog,
   DialogContent,
@@ -35,7 +35,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { formatDistanceToNow } from "date-fns"
 import { zhTW } from "date-fns/locale"
 import { useRouter } from "next/navigation"
-import type { Comment } from "@/lib/types/database.types"
+import type { PostComment } from "@/lib/types/database.types"
+import { cn } from "@/lib/utils"
 
 interface PostActionsProps {
   postId: string
@@ -44,7 +45,7 @@ interface PostActionsProps {
   initialCommentsCount: number
   initialSharesCount: number
   isLiked: boolean
-  initialComments?: Comment[]
+  initialComments?: PostComment[]
 }
 
 export function PostActions({
@@ -58,12 +59,12 @@ export function PostActions({
 }: PostActionsProps) {
   const { toast } = useToast()
   const router = useRouter()
-  const { user } = useUser()
+  const { user, checkPermission } = useAuth()
   const [likesCount, setLikesCount] = useState(initialLikesCount)
   const [commentsCount, setCommentsCount] = useState(initialCommentsCount)
   const [sharesCount, setSharesCount] = useState(initialSharesCount)
   const [liked, setLiked] = useState(isLiked)
-  const [comments, setComments] = useState<Comment[]>(initialComments)
+  const [comments, setComments] = useState<PostComment[]>(initialComments)
   const [newComment, setNewComment] = useState("")
   const [isLoadingComments, setIsLoadingComments] = useState(false)
   const [isCommentsOpen, setIsCommentsOpen] = useState(false)
@@ -79,18 +80,26 @@ export function PostActions({
 
   // 處理按讚
   const handleLike = async () => {
-    if (!user) {
+    if (!checkPermission('user')) {
       toast({
         variant: "destructive",
-        title: "請先登入",
-        description: "您需要登入才能按讚",
+        title: "無法執行操作",
+        description: "您可能需要登入或帳號已被封禁",
       })
       return
     }
 
     try {
-      if (liked) {
-        // 取消按讚
+      // 先檢查是否已經按讚
+      const { data: existingLike } = await supabase
+        .from("likes")
+        .select()
+        .eq("post_id", postId)
+        .eq("user_id", user.id)
+        .single()
+
+      if (existingLike) {
+        // 已經按讚，執行取消按讚
         const { error } = await supabase
           .from("likes")
           .delete()
@@ -102,7 +111,7 @@ export function PostActions({
         setLikesCount((prev) => prev - 1)
         setLiked(false)
       } else {
-        // 按讚
+        // 尚未按讚，執行按讚
         const { error } = await supabase
           .from("likes")
           .insert({ post_id: postId, user_id: user.id })
@@ -158,11 +167,11 @@ export function PostActions({
 
   // 發表評論
   const handleComment = async () => {
-    if (!user) {
+    if (!checkPermission('user')) {
       toast({
         variant: "destructive",
-        title: "請先登入",
-        description: "您需要登入才能發表評論",
+        title: "無法執行操作",
+        description: "您可能需要登入或帳號已被封禁",
       })
       return
     }
@@ -310,136 +319,134 @@ export function PostActions({
   }
 
   return (
-    <div className="flex justify-between w-full">
-      <div className="flex gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleLike}
-          className={liked ? "text-red-500" : ""}
-        >
-          <Heart className={`h-5 w-5 ${liked ? "fill-current" : ""}`} />
-          {likesCount > 0 && (
-            <span className="ml-2 text-sm">{likesCount}</span>
-          )}
-        </Button>
+    <div className="flex items-center gap-4">
+      <Button
+        variant="ghost"
+        className={cn(
+          "flex items-center gap-2 h-9 px-4",
+          liked && "text-red-500"
+        )}
+        onClick={handleLike}
+      >
+        <Heart className={cn("h-5 w-5", liked && "fill-current")} />
+        <span className="text-sm">{likesCount}</span>
+      </Button>
 
-        <Dialog open={isCommentsOpen} onOpenChange={setIsCommentsOpen}>
-          <DialogTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                setIsCommentsOpen(true)
-                loadComments()
-              }}
-            >
-              <MessageCircle className="h-5 w-5" />
-              {commentsCount > 0 && (
-                <span className="ml-2 text-sm">{commentsCount}</span>
-              )}
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>評論</DialogTitle>
-            </DialogHeader>
-            <div className="flex-1 overflow-y-auto space-y-4 my-4">
-              {isLoadingComments ? (
-                <div className="text-center text-muted-foreground">
-                  載入評論中...
-                </div>
-              ) : comments.length === 0 ? (
-                <div className="text-center text-muted-foreground">
-                  還沒有評論
-                </div>
-              ) : (
-                comments.map((comment) => (
-                  <div key={comment.id} className="flex gap-3">
-                    <Avatar>
-                      <AvatarImage
-                        src={comment.profiles?.avatar_url || "/placeholder.svg"}
-                        className="w-full h-full object-cover"
-                      />
-                      <AvatarFallback>
-                        {(comment.profiles?.username || "U")
-                          .charAt(0)
-                          .toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold">
-                            {comment.profiles?.username || "未知用戶"}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(comment.created_at), {
-                              addSuffix: true,
-                              locale: zhTW,
-                            })}
-                          </span>
-                        </div>
-                        {(user?.id === comment.user_id || isPostOwner) && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setSelectedCommentId(comment.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>確定要刪除這則評論嗎？</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  此操作無法復原。
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>取消</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteComment(comment.id)}
-                                >
-                                  刪除
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
+      <Dialog open={isCommentsOpen} onOpenChange={setIsCommentsOpen}>
+        <DialogTrigger asChild>
+          <Button
+            variant="ghost"
+            className="flex items-center gap-2 h-9 px-4"
+            onClick={() => {
+              setIsCommentsOpen(true)
+              loadComments()
+            }}
+          >
+            <MessageCircle className="h-5 w-5" />
+            <span className="text-sm">{commentsCount}</span>
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>評論</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-4 my-4">
+            {isLoadingComments ? (
+              <div className="text-center text-muted-foreground">
+                載入評論中...
+              </div>
+            ) : comments.length === 0 ? (
+              <div className="text-center text-muted-foreground">
+                還沒有評論
+              </div>
+            ) : (
+              comments.map((comment) => (
+                <div key={comment.id} className="flex gap-3">
+                  <Avatar>
+                    <AvatarImage
+                      src={comment.profiles?.avatar_url || "/placeholder.svg"}
+                      className="w-full h-full object-cover"
+                    />
+                    <AvatarFallback>
+                      {(comment.profiles?.username || "U")
+                        .charAt(0)
+                        .toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">
+                          {comment.profiles?.username || "未知用戶"}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(comment.created_at), {
+                            addSuffix: true,
+                            locale: zhTW,
+                          })}
+                        </span>
                       </div>
-                      <p className="text-sm mt-1">{comment.content}</p>
+                      {(user?.id === comment.user_id || isPostOwner) && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setSelectedCommentId(comment.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>確定要刪除這則評論嗎？</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                此操作無法復原。
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>取消</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteComment(comment.id)}
+                              >
+                                刪除
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
                     </div>
+                    <p className="text-sm mt-1">{comment.content}</p>
                   </div>
-                ))
-              )}
-            </div>
-            <div className="flex gap-2 mt-4">
-              <Textarea
-                placeholder="發表評論..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                className="flex-1"
-              />
-              <Button onClick={handleComment}>發送</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="flex gap-2 mt-4">
+            <Textarea
+              placeholder="發表評論..."
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              className="flex-1"
+            />
+            <Button onClick={handleComment}>發送</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-        <Button variant="ghost" size="icon" onClick={handleShare}>
-          <Share2 className="h-5 w-5" />
-          {sharesCount > 0 && (
-            <span className="ml-2 text-sm">{sharesCount}</span>
-          )}
-        </Button>
-      </div>
+      <Button
+        variant="ghost"
+        className="flex items-center gap-2 h-9 px-4"
+        onClick={handleShare}
+      >
+        <Share2 className="h-5 w-5" />
+        <span className="text-sm">{sharesCount}</span>
+      </Button>
 
       {isPostOwner && (
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" className="ml-auto">
               <MoreVertical className="h-5 w-5" />
             </Button>
           </AlertDialogTrigger>

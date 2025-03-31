@@ -11,9 +11,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { createClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
+import { useProfile } from "@/hooks/useProfile"
 import { toast } from "sonner"
 import { Flag } from "lucide-react"
+import { supabase } from "@/lib/supabase/client"
 
 interface ReportButtonProps {
   contentId: string
@@ -25,7 +27,8 @@ export function ReportButton({ contentId, userId, className }: ReportButtonProps
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const supabase = createClient()
+  const { profile } = useProfile()
+  const router = useRouter()
 
   const handleSubmit = async () => {
     if (!reason.trim()) {

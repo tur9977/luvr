@@ -1,7 +1,7 @@
 'use client'
 
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
   TableBody,
@@ -28,9 +28,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { createClient } from "@/lib/supabase/client"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
+import { supabase } from "@/lib/supabase/client"
 
 interface Content {
   id: string
@@ -53,7 +53,6 @@ export default function ContentReviewPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [selectedContent, setSelectedContent] = useState<Content | null>(null)
   const [showRejectDialog, setShowRejectDialog] = useState(false)
-  const supabase = createClient()
 
   // Fetch content list
   const fetchContents = async () => {

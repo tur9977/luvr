@@ -1,6 +1,6 @@
 "use client"
 
-import { PostCard, type PostWithProfile } from "./PostCard"
+import { PostCard, PostWithProfile } from "./PostCard"
 
 interface PostListProps {
   posts: PostWithProfile[]
@@ -17,7 +17,7 @@ export function PostList({ posts }: PostListProps) {
 
   return (
     <div className="space-y-4">
-      {posts.map((post) => (
+      {posts.map(post => (
         <PostCard key={post.id} post={post} />
       ))}
     </div>

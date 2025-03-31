@@ -2,6 +2,13 @@ import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 import { ReportList } from "@/app/admin/components/ReportList"
 import type { Report } from "@/lib/types/profiles"
+import { Metadata } from 'next'
+import { Toaster } from 'react-hot-toast'
+
+export const metadata: Metadata = {
+  title: '檢舉管理 | Luvr Admin',
+  description: '管理用戶檢舉'
+}
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -137,16 +144,29 @@ async function getReports(): Promise<Report[]> {
 }
 
 export default async function ReportsPage() {
-  console.log('Rendering ReportsPage...')
-  const reports = await getReports()
-  console.log('Reports loaded:', reports.length)
+  const supabase = createServerComponentClient({ cookies })
+  
+  const { data: { session } } = await supabase.auth.getSession()
+  
+  if (!session) {
+    return <div className="p-4">請先登入</div>
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single()
+
+  if (profile?.role !== 'admin') {
+    return <div className="p-4">只有管理員可以訪問此頁面</div>
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">檢舉管理</h2>
-      </div>
-      <ReportList reports={reports} />
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold mb-6">檢舉管理</h1>
+      <ReportList />
+      <Toaster />
     </div>
   )
 } 

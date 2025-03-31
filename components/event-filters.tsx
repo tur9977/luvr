@@ -39,6 +39,7 @@ export type EventFilters = {
   startDate: Date | null
   endDate: Date | null
   eventType: string
+  status: "active" | "completed"
 }
 
 interface EventFiltersProps {

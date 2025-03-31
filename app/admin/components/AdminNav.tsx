@@ -7,7 +7,8 @@ import {
   AlertTriangle,
   Users,
   FileText,
-  BarChart
+  BarChart,
+  Calendar
 } from "lucide-react"
 
 const navItems = [
@@ -30,6 +31,11 @@ const navItems = [
     title: "貼文管理",
     href: "/admin/posts",
     icon: <FileText className="h-4 w-4" />
+  },
+  {
+    title: "活動管理",
+    href: "/admin/events",
+    icon: <Calendar className="h-4 w-4" />
   }
 ]
 

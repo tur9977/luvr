@@ -1,17 +1,23 @@
 import type { Database } from './database.types'
+import type { ProfileRole } from './supabase'
 
 // 定義用戶角色類型
-export type UserRole = 'normal_user' | 'banned_user' | 'verified_user' | 'brand_user' | 'admin'
+export type UserRole = ProfileRole
 
 // 从数据库类型中提取Profile类型
-export type Profile = Database['public']['Tables']['profiles']['Row'] & {
-  posts?: { count: number } | null
-  reports?: { count: number } | null
-  role?: UserRole
-  full_name?: string | null
-  location?: string | null
-  bio?: string | null
-  email?: string | null
+export type Profile = {
+  id: string
+  username: string | null
+  full_name: string | null
+  avatar_url: string | null
+  location: string | null
+  bio: string | null
+  role: ProfileRole
+  created_at: string
+  updated_at: string
+  posts?: { count: number }
+  reports?: { count: number }
+  email?: string
 }
 
 export type AdminRole = 'super_admin' | 'admin' | 'moderator'

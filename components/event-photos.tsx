@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Image from "next/image"
 import { useProfile } from "@/hooks/useProfile"
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -66,7 +66,6 @@ export function EventPhotos({ eventId, photos: initialPhotos }: EventPhotosProps
   const [caption, setCaption] = useState("")
   const [isDragging, setIsDragging] = useState(false)
   const { profile } = useProfile()
-  const supabase = createClient()
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -327,6 +326,7 @@ export function EventPhotos({ eventId, photos: initialPhotos }: EventPhotosProps
                         alt="Preview"
                         fill
                         className="object-cover rounded-lg"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       />
                       <Button
                         type="button"
@@ -395,6 +395,7 @@ export function EventPhotos({ eventId, photos: initialPhotos }: EventPhotosProps
                   fill
                   priority={true}
                   className="object-cover transition-transform group-hover:scale-110"
+                  sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
                 />
                 {photo.caption && (
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-4">
@@ -407,6 +408,9 @@ export function EventPhotos({ eventId, photos: initialPhotos }: EventPhotosProps
 
           <Dialog open={!!selectedPhoto} onOpenChange={() => setSelectedPhoto(null)}>
             <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle className="sr-only">查看活動照片</DialogTitle>
+              </DialogHeader>
               {selectedPhoto && (
                 <div className="space-y-4">
                   <div className="relative aspect-video">
@@ -415,6 +419,7 @@ export function EventPhotos({ eventId, photos: initialPhotos }: EventPhotosProps
                       alt={selectedPhoto.caption || "活動照片"}
                       fill
                       className="object-contain"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
                   </div>
                   <div className="flex items-center justify-between">

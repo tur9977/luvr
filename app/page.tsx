@@ -1,118 +1,140 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useInView } from "react-intersection-observer"
+import { Loader2 } from "lucide-react"
+import { supabase } from "@/lib/supabase/client"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
-import type { Database } from "@/lib/types/database.types"
 import { PostList } from "@/components/posts/PostList"
-import type { PostWithProfile } from "@/components/posts/PostCard"
 import { EventList } from "@/components/events/EventList"
+import type { PostWithProfile } from "@/lib/types/database.types"
+import { useRouter } from "next/navigation"
 
-interface PostMedia {
-  id: string
-  media_url: string
-  media_type: "image" | "video"
-  aspect_ratio: number
-  duration?: number | null
-  order: number
-}
+const POSTS_PER_PAGE = 5
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+export default function HomePage() {
+  const [posts, setPosts] = useState<PostWithProfile[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const { ref, inView } = useInView()
+  const router = useRouter()
 
-async function getPosts(): Promise<PostWithProfile[]> {
-  try {
-    const supabase = createServerComponentClient<Database>({ cookies })
-    
-    // 首先獲取貼文數據
-    const { data: posts, error: postsError } = await supabase
-      .from('posts')
-      .select(`
-        *,
-        profiles!fk_posts_profiles (
-          id,
-          username,
-          avatar_url
-        ),
-        post_media (
-          id,
-          media_url,
-          media_type,
-          aspect_ratio,
-          duration,
-          order
-        ),
-        likes(count),
-        comments(
-          id,
-          content,
-          created_at,
-          profiles(
+  const handleTabChange = (value: string) => {
+    if (value === "events") {
+      router.push("/events")
+    }
+  }
+
+  const fetchPosts = async () => {
+    try {
+      setIsLoading(true)
+      const from = page * POSTS_PER_PAGE
+      const to = from + POSTS_PER_PAGE - 1
+
+      const { data: postsData, error: postsError } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          profiles!inner (
             id,
             username,
-            avatar_url
-          )
-        ),
-        shares(count)
-      `)
-      .order('created_at', { ascending: false })
+            avatar_url,
+            role
+          ),
+          post_media (
+            id,
+            media_url,
+            media_type,
+            aspect_ratio,
+            duration,
+            order
+          ),
+          likes(count),
+          comments(
+            id,
+            content,
+            created_at,
+            profiles(
+              id,
+              username,
+              avatar_url,
+              role
+            )
+          ),
+          shares(count)
+        `)
+        .order('created_at', { ascending: false })
+        .range(from, to)
 
-    if (postsError) {
-      console.error('獲取貼文時出錯:', postsError.message)
-      return []
-    }
+      if (postsError) throw postsError
 
-    if (!posts || posts.length === 0) {
-      return []
-    }
+      // 獲取當前用戶的點讚狀態
+      const { data: user } = await supabase.auth.getUser()
+      let likedPosts: string[] = []
 
-    let userLikedPosts = new Set<string>()
-    
-    try {
-      // 嘗試獲取用戶會話
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      // 如果有會話，則獲取用戶的讚
-      if (session?.user) {
-        const { data: userLikes } = await supabase
+      if (user?.user) {
+        const { data: likes } = await supabase
           .from('likes')
           .select('post_id')
-          .eq('user_id', session.user.id)
-        
-        userLikedPosts = new Set(userLikes?.map(like => like.post_id) || [])
-      }
-    } catch (error) {
-      console.error('獲取用戶會話時出錯:', error)
-      // 繼續處理貼文，但不包含用戶特定的數據
-    }
+          .eq('user_id', user.user.id)
+          .in('post_id', postsData.map(post => post.id))
 
-    // 處理每個貼文
-    const processedPosts = posts.map(post => {
-      return {
+        likedPosts = likes?.map(like => like.post_id) || []
+      }
+
+      // 處理數據格式
+      const formattedPosts = postsData.map(post => ({
         ...post,
-        media_type: post.media_type || (post.media_url?.match(/\.(mp4|mov|webm)$/i) ? 'video' : 'image'),
-        aspect_ratio: post.aspect_ratio || 1,
-        has_liked: userLikedPosts.has(post.id),
-        post_media: (post.post_media as PostMedia[] | null)?.sort((a, b) => a.order - b.order) || [],
+        has_liked: likedPosts.includes(post.id),
         _count: {
           likes: post.likes?.[0]?.count || 0,
           comments: post.comments?.length || 0,
           shares: post.shares?.[0]?.count || 0
         }
+      }))
+
+      if (formattedPosts.length < POSTS_PER_PAGE) {
+        setHasMore(false)
       }
-    })
 
-    return processedPosts as PostWithProfile[]
-  } catch (error) {
-    console.error('獲取貼文時發生異常:', error)
-    return []
+      // 使用 Map 來確保每個貼文 ID 只有一個最新的版本
+      setPosts(prevPosts => {
+        const postsMap = new Map()
+        
+        // 先加入現有的貼文
+        prevPosts.forEach(post => {
+          postsMap.set(post.id, post)
+        })
+        
+        // 加入新的貼文，如果有相同 ID 的會覆蓋舊的
+        formattedPosts.forEach(post => {
+          postsMap.set(post.id, post)
+        })
+        
+        // 轉換回陣列並保持原有順序
+        return Array.from(postsMap.values())
+      })
+    } catch (error) {
+      console.error('Error fetching posts:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
-}
 
-export default async function Home() {
-  const posts = await getPosts()
+  useEffect(() => {
+    fetchPosts()
+  }, [page])
+
+  useEffect(() => {
+    if (inView && hasMore && !isLoading) {
+      setPage(prev => prev + 1)
+    }
+  }, [inView, hasMore, isLoading])
 
   return (
-    <main className="container max-w-2xl mx-auto p-4">
-      <Tabs defaultValue="feed" className="w-full">
+    <main className="container max-w-2xl mx-auto p-4 space-y-4">
+      <Tabs defaultValue="feed" className="w-full" onValueChange={handleTabChange}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="feed">動態消息</TabsTrigger>
           <TabsTrigger value="events">活動</TabsTrigger>
@@ -124,6 +146,17 @@ export default async function Home() {
           <EventList />
         </TabsContent>
       </Tabs>
+      
+      {hasMore && (
+        <div
+          ref={ref}
+          className="flex justify-center p-4"
+        >
+          {isLoading && (
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          )}
+        </div>
+      )}
     </main>
   )
 }

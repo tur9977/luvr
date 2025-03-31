@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -15,7 +15,7 @@ import { format } from "date-fns"
 import { zhTW } from "date-fns/locale"
 import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useProfile } from '@/hooks/useProfile'
 import Image from "next/image"
 import { useUser } from "@/hooks/useUser"
@@ -48,6 +48,7 @@ function isVideoType(type: MediaType): type is "video" {
 export default function CreatePage() {
   const { toast } = useToast()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { profile } = useProfile()
   const { user } = useUser()
   const [date, setDate] = useState<Date>()
@@ -64,6 +65,62 @@ export default function CreatePage() {
   const [eventCoverPreview, setEventCoverPreview] = useState<string | null>(null)
   const [eventType, setEventType] = useState("social")
   const [isCreatingEvent, setIsCreatingEvent] = useState(false)
+  const [activeTab, setActiveTab] = useState<string>("post")
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    let mounted = true
+    let timeoutId: NodeJS.Timeout
+
+    const checkAuth = async () => {
+      try {
+        // 等待一小段時間，確保認證狀態已同步
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        if (!mounted) return
+
+        if (!user || !profile) {
+          console.log('Authentication check failed:', { user, profile })
+          
+          // 再次檢查以確保不是暫時性的狀態
+          await new Promise(resolve => setTimeout(resolve, 200))
+          
+          if (!mounted) return
+          
+          if (!user || !profile) {
+            toast({
+              variant: "destructive",
+              title: "請先登入",
+              description: "您需要登入才能創建內容"
+            })
+            router.replace('/auth/login')
+            return
+          }
+        }
+        
+        setIsLoading(false)
+      } catch (error) {
+        console.error('Authentication check error:', error)
+        if (mounted) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    timeoutId = setTimeout(checkAuth, 100)
+
+    return () => {
+      mounted = false
+      clearTimeout(timeoutId)
+    }
+  }, [user, profile, router, toast])
+
+  useEffect(() => {
+    const tab = searchParams.get("tab")
+    if (tab === "event" || tab === "post") {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
 
   const removeMedia = useCallback((index: number) => {
     setMediaFiles(prev => {
@@ -554,9 +611,17 @@ export default function CreatePage() {
     { value: "other", label: "其他" },
   ]
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
   return (
     <main className="container max-w-2xl mx-auto p-4 pt-8">
-      <Tabs defaultValue="post" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="post">發布貼文</TabsTrigger>
           <TabsTrigger value="event">建立活動</TabsTrigger>

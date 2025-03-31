@@ -1,10 +1,15 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import type { Database } from '@/lib/types/database.types'
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "../types/database.types"
 
-export const createClient = () => createClientComponentClient<Database>({
-  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-})
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  throw new Error("Missing environment variable: NEXT_PUBLIC_SUPABASE_URL")
+}
 
-export const supabase = createClient()
-export type { SupabaseClient } from '@supabase/auth-helpers-nextjs' 
+if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  throw new Error("Missing environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY")
+}
+
+// 導出預配置的 supabase 實例
+export const supabase = createClientComponentClient<Database>()
+
+export type { SupabaseClient } from '@supabase/supabase-js' 

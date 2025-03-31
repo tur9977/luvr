@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useProfile } from "@/hooks/useProfile"
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase/client"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -49,7 +49,6 @@ export function EventComments({ eventId, comments: initialComments }: EventComme
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest")
   const { profile } = useProfile()
   const router = useRouter()
-  const supabase = createClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

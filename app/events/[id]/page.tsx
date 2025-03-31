@@ -142,6 +142,39 @@ export default function EventPage() {
 
       if (eventError) throw eventError
 
+      // 自動更新活動狀態
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const eventDate = new Date(eventData.date)
+      eventDate.setHours(0, 0, 0, 0)
+      
+      let newStatus = eventData.status
+      
+      // 如果活動不是已取消狀態，則根據日期更新狀態
+      if (eventData.status !== "cancelled") {
+        if (eventDate.getTime() === today.getTime()) {
+          newStatus = "ongoing"
+        } else if (eventDate.getTime() < today.getTime()) {
+          newStatus = "completed"
+        } else {
+          newStatus = "upcoming"
+        }
+        
+        // 如果狀態有變化，更新數據庫
+        if (newStatus !== eventData.status) {
+          const { error: updateError } = await supabase
+            .from("events")
+            .update({ status: newStatus })
+            .eq("id", id)
+
+          if (updateError) {
+            console.error("Error updating event status:", updateError)
+          } else {
+            eventData.status = newStatus
+          }
+        }
+      }
+
       // 獲取活動參與者
       const { data: participants, error: participantsError } = await supabase
         .from("event_participants")
@@ -685,6 +718,40 @@ export default function EventPage() {
       <div className="space-y-2">
         <h2 className="text-2xl font-bold tracking-tight">活動評論</h2>
         {id && <EventComments eventId={id} comments={comments} />}
+      </div>
+
+      <div className="flex justify-between items-center mt-6">
+        <div className="flex items-center gap-4">
+          <h1 className="text-3xl font-bold">{event?.title}</h1>
+          <span
+            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+              event?.status === "draft"
+                ? "bg-gray-100 text-gray-800"
+                : event?.status === "upcoming"
+                ? "bg-blue-100 text-blue-800"
+                : event?.status === "ongoing"
+                ? "bg-green-100 text-green-800"
+                : event?.status === "completed"
+                ? "bg-purple-100 text-purple-800"
+                : "bg-red-100 text-red-800"
+            }`}
+          >
+            {event?.status === "draft"
+              ? "草稿"
+              : event?.status === "upcoming"
+              ? "即將開始"
+              : event?.status === "ongoing"
+              ? "進行中"
+              : event?.status === "completed"
+              ? "已結束"
+              : "已取消"}
+          </span>
+        </div>
+        {profile && event?.user_id === profile.id && (
+          <Link href={`/events/${params.id}/edit`}>
+            <Button>編輯活動</Button>
+          </Link>
+        )}
       </div>
     </main>
   )

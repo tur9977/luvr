@@ -15,13 +15,8 @@ export async function GET(request: NextRequest) {
     
     try {
       // 交換 code 獲取 session
-      const { error } = await supabase.auth.exchangeCodeForSession(code)
+      await supabase.auth.exchangeCodeForSession(code)
       
-      if (error) {
-        console.error('Auth callback error:', error)
-        return NextResponse.redirect(new URL('/auth?error=callback_failed', request.url))
-      }
-
       // 根據操作類型進行不同的重定向
       if (type === 'recovery') {
         // 密碼重設

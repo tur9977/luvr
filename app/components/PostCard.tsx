@@ -2,12 +2,11 @@
 
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
 import { ReportButton } from "@/components/ReportButton"
-import { MessageSquare, Heart } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { zhTW } from "date-fns/locale"
 import Link from "next/link"
+import { PostActions } from "@/components/PostActions"
 
 interface PostCardProps {
   post: {
@@ -17,11 +16,13 @@ interface PostCardProps {
     created_at: string
     likes_count?: number
     comments_count?: number
+    shares_count?: number
     user: {
       id: string
       username: string
       avatar_url?: string
     }
+    has_liked?: boolean
   }
   currentUserId?: string
 }
@@ -59,17 +60,15 @@ export function PostCard({ post, currentUserId }: PostCardProps) {
           <p className="text-gray-600 line-clamp-3">{post.content}</p>
         </Link>
       </CardContent>
-      <CardFooter className="flex justify-between">
-        <div className="flex gap-4">
-          <Button variant="ghost" size="sm">
-            <Heart className="h-4 w-4 mr-2" />
-            {post.likes_count || 0}
-          </Button>
-          <Button variant="ghost" size="sm">
-            <MessageSquare className="h-4 w-4 mr-2" />
-            {post.comments_count || 0}
-          </Button>
-        </div>
+      <CardFooter>
+        <PostActions
+          postId={post.id}
+          userId={post.user.id}
+          initialLikesCount={post.likes_count || 0}
+          initialCommentsCount={post.comments_count || 0}
+          initialSharesCount={post.shares_count || 0}
+          isLiked={post.has_liked || false}
+        />
       </CardFooter>
     </Card>
   )

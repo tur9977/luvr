@@ -1,77 +1,63 @@
 "use client"
 
-import { useState } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
+import { useState } from "react"
 import { toast } from "sonner"
-import { useProfile } from "@/hooks/useProfile"
+import type { Database } from "@/lib/types/database.types"
 
-interface FollowButtonProps {
-  userId: string
-  initialIsFollowing: boolean
+export interface FollowButtonProps {
+  targetUserId: string
+  isFollowing: boolean
 }
 
-export function FollowButton({ userId, initialIsFollowing }: FollowButtonProps) {
+export function FollowButton({ targetUserId, isFollowing: initialIsFollowing }: FollowButtonProps) {
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-  const { profile } = useProfile()
-  const supabase = createClientComponentClient()
+  const supabase = createClientComponentClient<Database>()
 
   const handleFollow = async () => {
-    if (!profile) {
-      toast.error('請先登入')
-      return
-    }
-
-    if (profile.id === userId) {
-      toast.error('不能關注自己')
-      return
-    }
-
-    setIsLoading(true)
-
     try {
+      setIsLoading(true)
+
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError || !user) {
+        throw new Error("請先登入")
+      }
+
       if (isFollowing) {
-        // 取消關注
+        // 取消追蹤
         const { error } = await supabase
-          .from('follows')
+          .from("follows")
           .delete()
-          .eq('follower_id', profile.id)
-          .eq('following_id', userId)
+          .eq("follower_id", user.id)
+          .eq("following_id", targetUserId)
 
         if (error) throw error
-
-        toast.success('已取消關注')
+        toast.success("已取消追蹤")
       } else {
-        // 添加關注
+        // 追蹤
         const { error } = await supabase
-          .from('follows')
-          .insert([
-            {
-              follower_id: profile.id,
-              following_id: userId
-            }
-          ])
+          .from("follows")
+          .insert({
+            follower_id: user.id,
+            following_id: targetUserId
+          })
 
-        if (error) {
-          if (error.code === '23505') {
-            toast.error('您已經關注了這個用戶')
-          } else {
-            throw error
-          }
-          return
-        }
-
-        toast.success('已關注')
+        if (error) throw error
+        toast.success("已追蹤")
       }
 
       setIsFollowing(!isFollowing)
       router.refresh()
     } catch (error) {
-      console.error('關注操作失敗:', error)
-      toast.error('操作失敗，請稍後再試')
+      if (error instanceof Error) {
+        toast.error(error.message)
+      } else {
+        toast.error("操作失敗，請稍後再試")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -82,9 +68,8 @@ export function FollowButton({ userId, initialIsFollowing }: FollowButtonProps) 
       variant={isFollowing ? "outline" : "default"}
       onClick={handleFollow}
       disabled={isLoading}
-      className="w-28"
     >
-      {isFollowing ? "取消關注" : "關注"}
+      {isFollowing ? "取消追蹤" : "追蹤"}
     </Button>
   )
 } 

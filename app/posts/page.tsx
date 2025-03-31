@@ -1,15 +1,16 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase/client"
 import { PostCard } from "@/components/PostCard"
 import { toast } from "sonner"
+import { Metadata } from "next"
+import { PostList } from "@/components/posts/PostList"
 
 export default function PostsPage() {
   const [posts, setPosts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [currentUser, setCurrentUser] = useState<any>(null)
-  const supabase = createClient()
 
   useEffect(() => {
     const fetchPosts = async () => {

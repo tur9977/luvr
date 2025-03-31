@@ -63,16 +63,6 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      // 先檢查是否已經有活動的會話
-      const { data: { session: existingSession } } = await supabase.auth.getSession()
-      
-      // 如果有現有會話，先登出
-      if (existingSession) {
-        await supabase.auth.signOut()
-        // 等待一小段時間確保登出完成
-        await new Promise(resolve => setTimeout(resolve, 1000))
-      }
-
       // 嘗試登入
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: loginData.email,
@@ -133,8 +123,8 @@ export default function LoginPage() {
 
       toast.success("登入成功！")
       
-      // 使用 window.location.href 進行完整頁面刷新
-      window.location.href = '/'
+      // 使用 router.push 進行導航
+      router.push('/')
     } catch (error) {
       console.error("Login error:", error)
       toast.error("登入失敗：" + (error as Error).message)
