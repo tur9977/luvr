@@ -31,7 +31,8 @@ export async function middleware(req: NextRequest) {
     const isProtectedRoute = 
       req.nextUrl.pathname.startsWith('/create') ||
       req.nextUrl.pathname.startsWith('/profile') ||
-      req.nextUrl.pathname.startsWith('/admin')
+      req.nextUrl.pathname.startsWith('/admin') ||
+      req.nextUrl.pathname.match(/^\/events\/[^/]+\/edit/)
 
     // 檢查是否是認證相關頁面
     const isAuthRoute = req.nextUrl.pathname.startsWith('/auth')
@@ -113,6 +114,7 @@ export const config = {
     '/profile/:path*',
     '/auth/:path*',
     '/admin/:path*',
+    '/events/:id/edit',
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 } 

@@ -57,6 +57,7 @@ export function UserAvatar({
           src={avatarUrl || undefined} 
           alt={username}
           className="object-cover"
+          style={{ width: "100%", height: "100%" }}
         />
         <AvatarFallback>{username[0]?.toUpperCase()}</AvatarFallback>
       </Avatar>

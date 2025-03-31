@@ -97,9 +97,7 @@ export function EventList() {
       {events.length > 0 ? (
         <>
           {events.map((event) => (
-            <Link key={event.id} href={`/events/${event.id}`}>
-              <EventCard event={event} />
-            </Link>
+            <EventCard key={event.id} event={event} />
           ))}
           <div className="flex justify-center">
             <Button asChild>

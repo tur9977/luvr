@@ -23,7 +23,8 @@ type Event = Database["public"]["Tables"]["events"]["Row"] & {
     username: string | null
     avatar_url: string | null
   }
-  participants: {
+  event_participants: {
+    event_id: string
     status: string
     user_id: string
   }[]
@@ -82,24 +83,25 @@ export default function EventsPage() {
       
       if (eventsError) throw eventsError
 
-      // 獲取每個活動的參與者
-      const eventsWithParticipants = await Promise.all(
-        eventsData.map(async (event) => {
-          const { data: participants, error: participantsError } = await supabase
-            .from("event_participants")
-            .select("status, user_id")
-            .eq("event_id", event.id)
+      // 然後獲取這些活動的參與者數據
+      if (eventsData && eventsData.length > 0) {
+        const { data: participantsData, error: participantsError } = await supabase
+          .from("event_participants")
+          .select("event_id, status, user_id")
+          .in("event_id", eventsData.map(event => event.id))
 
-          if (participantsError) {
-            console.error("Error fetching participants:", participantsError)
-            return { ...event, participants: [] }
-          }
+        if (participantsError) throw participantsError
 
-          return { ...event, participants: participants || [] }
-        })
-      )
+        // 將參與者數據合併到活動數據中
+        const eventsWithParticipants = eventsData.map(event => ({
+          ...event,
+          event_participants: participantsData?.filter(p => p.event_id === event.id) || []
+        }))
 
-      setEvents(eventsWithParticipants)
+        setEvents(eventsWithParticipants)
+      } else {
+        setEvents([])
+      }
     } catch (error) {
       console.error("Error fetching events:", error)
       toast({
@@ -170,12 +172,12 @@ export default function EventsPage() {
   }
 
   const getParticipantCount = (event: Event, status: string) => {
-    return event.participants?.filter(p => p.status === status).length || 0
+    return event.event_participants?.filter(p => p.status === status).length || 0
   }
 
   const getUserEventStatus = (event: Event) => {
     if (!profile) return null
-    return event.participants?.find(p => p.user_id === profile.id)?.status || null
+    return event.event_participants?.find(p => p.user_id === profile.id)?.status || null
   }
 
   const toggleFilters = () => {
@@ -245,18 +247,14 @@ export default function EventsPage() {
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {events.map((event) => (
-              <Link key={event.id} href={`/events/${event.id}`} className="block">
-                <EventCard event={event} />
-              </Link>
+              <EventCard key={event.id} event={event} />
             ))}
           </div>
         </TabsContent>
         <TabsContent value="completed">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {events.map((event) => (
-              <Link key={event.id} href={`/events/${event.id}`} className="block">
-                <EventCard event={event} />
-              </Link>
+              <EventCard key={event.id} event={event} />
             ))}
           </div>
         </TabsContent>

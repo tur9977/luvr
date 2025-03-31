@@ -41,6 +41,7 @@ export default function MediaGallery({ media, caption, priority = false }: Media
           className="object-cover"
           priority={priority}
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          style={{ width: "100%", height: "100%" }}
         />
       ) : (
         <Swiper
@@ -58,6 +59,7 @@ export default function MediaGallery({ media, caption, priority = false }: Media
                 fill
                 className="object-cover"
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                style={{ width: "100%", height: "100%" }}
               />
             </SwiperSlide>
           ))}

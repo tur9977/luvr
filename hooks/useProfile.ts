@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase/client"
 import type { Profile } from "@/lib/types/profiles"
@@ -19,6 +19,7 @@ export function useProfile() {
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState<Error | null>(null)
+  const initializedRef = useRef(false)
 
   const createProfile = async (userId: string, email: string) => {
     try {
@@ -92,7 +93,6 @@ export function useProfile() {
       if (!force) {
         const cachedProfile = getCachedProfile()
         if (cachedProfile) {
-          console.log('使用緩存的個人資料')
           setProfile(cachedProfile)
           setLoading(false)
           return
@@ -110,13 +110,11 @@ export function useProfile() {
       }
 
       if (!session) {
-        console.log('未找到認證會話')
         setProfile(null)
         return
       }
 
       const user = session.user
-      console.log('正在獲取用戶資料:', user.id)
       
       const { data, error } = await supabase
         .from('profiles')
@@ -132,14 +130,12 @@ export function useProfile() {
       }
 
       if (!data) {
-        console.log('未找到個人資料，正在創建新資料')
         const newProfile = await createProfile(user.id, user.email || '')
         setProfile(newProfile)
         setCachedProfile(newProfile)
         return
       }
 
-      console.log('成功獲取個人資料')
       setProfile(data)
       setCachedProfile(data)
     } catch (error) {
@@ -152,21 +148,19 @@ export function useProfile() {
   }, [])
 
   useEffect(() => {
-    // 初始加載時使用緩存
-    fetchProfile(false)
+    if (!initializedRef.current) {
+      initializedRef.current = true
+      fetchProfile(false)
+    }
 
     // 監聽認證狀態變化
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('認證狀態變更:', event)
-      
       if (event === 'SIGNED_IN') {
-        // 登入時強制更新個人資料
-        console.log('登入後重新獲取個人資料')
         await fetchProfile(true)
       } else if (event === 'SIGNED_OUT') {
-        console.log('登出後清除個人資料')
         localStorage.removeItem('userProfile')
         setProfile(null)
+        initializedRef.current = false
       }
     })
 

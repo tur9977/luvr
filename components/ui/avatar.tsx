@@ -30,7 +30,7 @@ const AvatarImage = React.forwardRef<
       "aspect-square h-full w-full object-cover",
       className
     )}
-    style={{ width: "auto", height: "auto" }}
+    style={{ width: "100%", height: "100%" }}
     {...props}
   />
 ))

@@ -7,13 +7,15 @@ import { zhTW } from "date-fns/locale"
 import Image from "next/image"
 import Link from "next/link"
 import { Database } from "@/lib/types/database.types"
+import { useProfile } from "@/hooks/useProfile"
+import { Button } from "@/components/ui/button"
 
 type Event = Database["public"]["Tables"]["events"]["Row"] & {
   profiles: {
     username: string | null
     avatar_url: string | null
   }
-  participants: {
+  event_participants: {
     status: string
     user_id: string
   }[]
@@ -24,9 +26,12 @@ interface EventCardProps {
 }
 
 export function EventCard({ event }: EventCardProps) {
+  const { profile } = useProfile()
   const getParticipantCount = (status: string) => {
-    return event.participants?.filter(p => p.status === status).length || 0
+    return event.event_participants?.filter(p => p.status === status).length || 0
   }
+
+  const isOwner = profile?.id === event.user_id
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
@@ -64,27 +69,34 @@ export function EventCard({ event }: EventCardProps) {
             {event.description}
           </p>
         </CardContent>
-        <CardFooter className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            {event.profiles.avatar_url ? (
-              <Image
-                src={event.profiles.avatar_url}
-                alt={event.profiles.username || ""}
-                width={20}
-                height={20}
-                className="rounded-full"
-              />
-            ) : (
-              <UserIcon className="h-5 w-5" />
-            )}
-            <span>{event.profiles.username || "未知用戶"}</span>
-          </div>
+      </Link>
+      <CardFooter className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          {event.profiles.avatar_url ? (
+            <Image
+              src={event.profiles.avatar_url}
+              alt={event.profiles.username || ""}
+              width={20}
+              height={20}
+              className="rounded-full"
+            />
+          ) : (
+            <UserIcon className="h-5 w-5" />
+          )}
+          <span>{event.profiles.username || "未知用戶"}</span>
+        </div>
+        <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-4">
             <span>{getParticipantCount("going")} 人參加</span>
             <span>{getParticipantCount("interested")} 人感興趣</span>
           </div>
-        </CardFooter>
-      </Link>
+          {isOwner && (
+            <Link href={`/events/${event.id}/edit`}>
+              <Button variant="outline" size="sm">編輯活動</Button>
+            </Link>
+          )}
+        </div>
+      </CardFooter>
     </Card>
   )
 } 

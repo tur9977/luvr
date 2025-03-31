@@ -29,9 +29,22 @@ import { EventComments } from "@/components/event-comments"
 import { EventPhotos } from "@/components/event-photos"
 import { EventReminder } from "@/components/event-reminder"
 import { EventCalendarSync } from "@/components/event-calendar-sync"
+import { EventHeader } from "@/components/events/EventHeader"
+import { EventActions } from "@/components/events/EventActions"
 import { cn } from "@/lib/utils"
 
-type Event = Database["public"]["Tables"]["events"]["Row"] & {
+type Event = {
+  id: string
+  user_id: string
+  title: string
+  description: string | null
+  location: string | null
+  date: string
+  status: string
+  max_participants: number | null
+  cover_url: string | null
+  created_at: string
+  updated_at: string
   profiles: {
     username: string | null
     avatar_url: string | null
@@ -75,7 +88,7 @@ type Photo = {
   }
 }
 
-// 添加 Supabase 返回的原始照片类型
+// 添加 Supabase 返回的原始照片類型
 type PhotoFromSupabase = {
   id: string
   event_id: string
@@ -86,7 +99,7 @@ type PhotoFromSupabase = {
   updated_at: string
 }
 
-// 添加 Supabase 返回的原始事件类型
+// 添加 Supabase 返回的原始事件類型
 type EventFromSupabase = Omit<Database["public"]["Tables"]["events"]["Row"], "profiles"> & {
   profiles?: Array<{
     username: string | null
@@ -127,7 +140,6 @@ export default function EventPage() {
     if (!id || id === 'page.tsx') return
 
     try {
-      // 獲取活動基本信息
       const { data: eventData, error: eventError } = await supabase
         .from("events")
         .select(`
@@ -142,177 +154,34 @@ export default function EventPage() {
 
       if (eventError) throw eventError
 
-      // 自動更新活動狀態
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const eventDate = new Date(eventData.date)
-      eventDate.setHours(0, 0, 0, 0)
-      
-      let newStatus = eventData.status
-      
-      // 如果活動不是已取消狀態，則根據日期更新狀態
-      if (eventData.status !== "cancelled") {
-        if (eventDate.getTime() === today.getTime()) {
-          newStatus = "ongoing"
-        } else if (eventDate.getTime() < today.getTime()) {
-          newStatus = "completed"
-        } else {
-          newStatus = "upcoming"
-        }
-        
-        // 如果狀態有變化，更新數據庫
-        if (newStatus !== eventData.status) {
-          const { error: updateError } = await supabase
-            .from("events")
-            .update({ status: newStatus })
-            .eq("id", id)
-
-          if (updateError) {
-            console.error("Error updating event status:", updateError)
-          } else {
-            eventData.status = newStatus
-          }
-        }
+      if (!eventData) {
+        toast({
+          variant: "destructive",
+          title: "錯誤",
+          description: "找不到該活動",
+        })
+        router.push("/events")
+        return
       }
 
-      // 獲取活動參與者
-      const { data: participants, error: participantsError } = await supabase
-        .from("event_participants")
-        .select(`
-          status,
-          user_id,
-          profiles:user_id (
-            username,
-            avatar_url
-          )
-        `)
-        .eq("event_id", id)
-
-      if (participantsError) {
-        console.error("Error fetching participants:", participantsError)
-      }
-
-      // 处理 eventData.profiles 为数组的情况
-      const eventProfiles = eventData.profiles && Array.isArray(eventData.profiles) 
-        ? eventData.profiles[0] || { username: null, avatar_url: null }
-        : eventData.profiles || { username: null, avatar_url: null };
-      
-      // 处理参与者的 profiles 数组
-      const transformedParticipants = (participants || []).map(participant => {
-        const participantProfiles = participant.profiles && Array.isArray(participant.profiles)
-          ? participant.profiles[0] || { username: null, avatar_url: null }
-          : participant.profiles || { username: null, avatar_url: null };
-          
-        return {
-          status: participant.status,
-          user_id: participant.user_id,
-          profiles: participantProfiles
-        };
-      });
-
-      // 獲取活動評論
-      const { data: commentsData, error: commentsError } = await supabase
-        .from("event_comments")
-        .select(`
-          id,
-          event_id,
-          user_id,
-          content,
-          created_at,
-          updated_at
-        `)
-        .eq("event_id", id)
-        .order("created_at", { ascending: false })
-
-      if (commentsError) {
-        console.error("Error fetching comments:", commentsError)
-      }
-
-      // 獲取評論者的個人資料
-      const commentUserIds = (commentsData || []).map(comment => comment.user_id)
-      const { data: profilesData } = await supabase
-        .from("profiles")
-        .select("id, avatar_url, full_name, username")
-        .in("id", commentUserIds)
-
-      // 將個人資料數據與評論數據合併
-      const transformedComments = (commentsData || []).map(comment => {
-        const profile = profilesData?.find(p => p.id === comment.user_id)
-        return {
-          ...comment,
-          profiles: {
-            avatar_url: profile?.avatar_url || null,
-            full_name: profile?.full_name || null,
-            username: profile?.username || null
-          }
-        }
-      })
-
-      // 獲取活動照片
-      const { data: photosData, error: photosError } = await supabase
-        .from("event_photos")
-        .select(`
-          id,
-          event_id,
-          user_id,
-          photo_url,
-          caption,
-          created_at,
-          updated_at
-        `)
-        .eq("event_id", id)
-        .order("created_at", { ascending: false })
-
-      if (photosError) {
-        console.error("Error fetching photos:", photosError)
-      }
-
-      // 获取照片上传者的个人资料
-      const photoUserIds = (photosData || []).map(photo => photo.user_id)
-      let photoProfilesData = null
-      if (photoUserIds.length > 0) {
-        const { data: profilesData } = await supabase
-          .from("profiles")
-          .select("id, avatar_url, full_name, username")
-          .in("id", photoUserIds)
-        
-        photoProfilesData = profilesData
-      }
-
-      // 转换照片数据，确保 profiles 字段格式正确
-      const transformedPhotos = (photosData || []).map((photo: PhotoFromSupabase) => {
-        const profile = photoProfilesData?.find(p => p.id === photo.user_id)
-        
-        return {
-          id: photo.id,
-          event_id: photo.event_id,
-          user_id: photo.user_id,
-          photo_url: photo.photo_url,
-          caption: photo.caption,
-          created_at: photo.created_at,
-          updated_at: photo.updated_at,
-          profiles: {
-            avatar_url: profile?.avatar_url || null,
-            full_name: profile?.full_name || null,
-            username: profile?.username || null
-          }
-        } as Photo;
-      })
-
-      setEvent({
+      // 確保所有必要的字段都存在
+      const processedEventData = {
         ...eventData,
-        participants: transformedParticipants
-      })
-      setComments(transformedComments)
-      setPhotos(transformedPhotos)
+        id: eventData.id || id,
+        title: eventData.title || "",
+        date: eventData.date || new Date().toISOString(),
+        location: eventData.location || null,
+        user_id: eventData.user_id || "",
+      }
+
+      setEvent(processedEventData as Event)
     } catch (error) {
       console.error("Error fetching event:", error)
       toast({
         variant: "destructive",
         title: "錯誤",
-        description: "無法載入活動資訊",
+        description: "無法載入活動資料",
       })
-      router.push('/events')
     } finally {
       setLoading(false)
     }
@@ -468,7 +337,7 @@ export default function EventPage() {
   }
 
   const currentStatus = getUserEventStatus()
-  const isOwner = profile?.id === event.user_id
+  const isOwner = !!profile?.id && profile.id === event.user_id
 
   return (
     <main className="container max-w-2xl mx-auto p-4 pt-8">
@@ -484,32 +353,14 @@ export default function EventPage() {
           </div>
         )}
         <CardHeader>
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold">{event.title}</h1>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleShare}
-                title="分享活動"
-              >
-                <Share2 className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <CalendarIcon className="h-4 w-4" />
-              <time dateTime={event.date}>
-                {format(new Date(event.date), "PPP", { locale: zhTW })}
-              </time>
-              <EventReminder eventId={event.id} eventDate={event.date} />
-            </div>
-            {event.location && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <MapPinIcon className="h-4 w-4" />
-                <span>{event.location}</span>
-              </div>
-            )}
-          </div>
+          <EventHeader
+            title={event.title}
+            date={event.date}
+            location={event.location}
+            eventId={event.id}
+            isOwner={!!profile?.id && profile.id === event.user_id}
+            onShare={() => setShowShareDialog(true)}
+          />
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-2 text-sm">
@@ -612,8 +463,8 @@ export default function EventPage() {
               <EventCalendarSync
                 eventTitle={event.title}
                 eventDate={event.date}
-                eventLocation={event.location}
-                eventDescription={event.description}
+                eventLocation={event.location || undefined}
+                eventDescription={event.description || ""}
               />
             </div>
           </div>

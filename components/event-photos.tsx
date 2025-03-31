@@ -327,6 +327,7 @@ export function EventPhotos({ eventId, photos: initialPhotos }: EventPhotosProps
                         fill
                         className="object-cover rounded-lg"
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        style={{ width: "100%", height: "100%" }}
                       />
                       <Button
                         type="button"
@@ -396,6 +397,7 @@ export function EventPhotos({ eventId, photos: initialPhotos }: EventPhotosProps
                   priority={true}
                   className="object-cover transition-transform group-hover:scale-110"
                   sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
+                  style={{ width: "100%", height: "100%" }}
                 />
                 {photo.caption && (
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-4">
@@ -420,6 +422,7 @@ export function EventPhotos({ eventId, photos: initialPhotos }: EventPhotosProps
                       fill
                       className="object-contain"
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      style={{ width: "100%", height: "100%" }}
                     />
                   </div>
                   <div className="flex items-center justify-between">
