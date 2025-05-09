@@ -287,6 +287,7 @@ export interface Post {
   comments_count: number
   shares_count: number
   is_liked?: boolean
+  location?: string | null
 }
 
 export interface PostWithProfile extends Post {

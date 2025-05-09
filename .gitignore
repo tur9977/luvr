@@ -35,3 +35,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDE
+.vscode/
+.idea/
+
+# 其他不需要的文件
+dating-app-v1/
+my-dating-app/

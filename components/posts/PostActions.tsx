@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Heart, MessageCircle, Share2, MoreVertical, Trash2 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/lib/supabase/client"
-import { useUser } from "@/hooks/useUser"
+import { useAuth } from "@/hooks/useAuth"
 import {
   Dialog,
   DialogContent,
@@ -51,9 +51,10 @@ export function PostActions({
   isLiked,
   initialComments = [],
 }: PostActionsProps) {
+  console.log('PostActions', { postId, userId, initialLikesCount, initialCommentsCount, initialSharesCount, isLiked, initialComments });
   const { toast } = useToast()
   const router = useRouter()
-  const { user } = useUser()
+  const { user } = useAuth()
   const [likesCount, setLikesCount] = useState(initialLikesCount)
   const [commentsCount, setCommentsCount] = useState(initialCommentsCount)
   const [sharesCount, setSharesCount] = useState(initialSharesCount)
@@ -92,7 +93,15 @@ export function PostActions({
           .eq("post_id", postId)
           .eq("user_id", user.id)
 
-        if (error) throw error
+        if (error) {
+          console.error("取消按讚失敗:", error)
+          toast({
+            variant: "destructive",
+            title: "操作失敗",
+            description: error.message || "請稍後再試",
+          })
+          throw error;
+        }
 
         setLikesCount((prev) => prev - 1)
         setLiked(false)
@@ -102,7 +111,15 @@ export function PostActions({
           .from("likes")
           .insert({ post_id: postId, user_id: user.id })
 
-        if (error) throw error
+        if (error) {
+          console.error("按讚失敗:", error)
+          toast({
+            variant: "destructive",
+            title: "操作失敗",
+            description: error.message || "請稍後再試",
+          })
+          throw error;
+        }
 
         setLikesCount((prev) => prev + 1)
         setLiked(true)
@@ -112,7 +129,7 @@ export function PostActions({
       toast({
         variant: "destructive",
         title: "操作失敗",
-        description: "請稍後再試",
+        description: error instanceof Error ? error.message : "請稍後再試",
       })
     }
   }
@@ -191,7 +208,15 @@ export function PostActions({
         `)
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error("發表評論失敗:", error)
+        toast({
+          variant: "destructive",
+          title: "發表評論失敗",
+          description: error.message || "請稍後再試",
+        })
+        throw error;
+      }
 
       setComments((prev) => [data, ...prev])
       setCommentsCount((prev) => prev + 1)
@@ -201,7 +226,7 @@ export function PostActions({
       toast({
         variant: "destructive",
         title: "發表評論失敗",
-        description: "請稍後再試",
+        description: error instanceof Error ? error.message : "請稍後再試",
       })
     }
   }
@@ -215,7 +240,15 @@ export function PostActions({
         .eq("id", commentId)
         .eq("user_id", user?.id)
 
-      if (error) throw error
+      if (error) {
+        console.error("刪除評論失敗:", error)
+        toast({
+          variant: "destructive",
+          title: "刪除失敗",
+          description: error.message || "請稍後再試",
+        })
+        throw error;
+      }
 
       setComments((prev) => prev.filter((comment) => comment.id !== commentId))
       setCommentsCount((prev) => prev - 1)
@@ -230,7 +263,7 @@ export function PostActions({
       toast({
         variant: "destructive",
         title: "刪除失敗",
-        description: "請稍後再試",
+        description: error instanceof Error ? error.message : "請稍後再試",
       })
     }
   }
@@ -244,7 +277,15 @@ export function PostActions({
         .eq("id", postId)
         .eq("user_id", user?.id)
 
-      if (error) throw error
+      if (error) {
+        console.error("刪除貼文失敗:", error)
+        toast({
+          variant: "destructive",
+          title: "刪除失敗",
+          description: error.message || "請稍後再試",
+        })
+        throw error;
+      }
 
       toast({
         title: "刪除成功",
@@ -257,7 +298,7 @@ export function PostActions({
       toast({
         variant: "destructive",
         title: "刪除失敗",
-        description: "請稍後再試",
+        description: error instanceof Error ? error.message : "請稍後再試",
       })
     }
   }

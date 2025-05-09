@@ -9,6 +9,7 @@ import { PostList } from "@/components/posts/PostList"
 import { EventList } from "@/components/events/EventList"
 import type { PostWithProfile } from "@/lib/types/database.types"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/hooks/useAuth"
 
 const POSTS_PER_PAGE = 5
 
@@ -19,6 +20,7 @@ export default function HomePage() {
   const [hasMore, setHasMore] = useState(true)
   const { ref, inView } = useInView()
   const router = useRouter()
+  const { user } = useAuth()
 
   const handleTabChange = (value: string) => {
     if (value === "events") {
@@ -86,6 +88,10 @@ export default function HomePage() {
       // 處理數據格式
       const formattedPosts = postsData.map(post => ({
         ...post,
+        caption: post.caption ?? "",
+        media_url: post.media_url ?? (post.post_media?.[0]?.media_url ?? ""),
+        media_type: post.media_type ?? (post.post_media?.[0]?.media_type ?? "image"),
+        aspect_ratio: post.aspect_ratio ?? (post.post_media?.[0]?.aspect_ratio ?? 1),
         has_liked: likedPosts.includes(post.id),
         _count: {
           likes: post.likes?.[0]?.count || 0,
@@ -140,7 +146,7 @@ export default function HomePage() {
           <TabsTrigger value="events">活動</TabsTrigger>
         </TabsList>
         <TabsContent value="feed" className="space-y-4 mt-4">
-          <PostList posts={posts} />
+          <PostList posts={posts} currentUserId={user?.id} />
         </TabsContent>
         <TabsContent value="events" className="space-y-4 mt-4">
           <EventList />

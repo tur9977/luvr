@@ -60,7 +60,7 @@ export function UserNav() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/profile")}>
+        <DropdownMenuItem onClick={() => router.push(`/profile/${profile?.id}`)}>
           <User className="mr-2 h-4 w-4" />
           <span>個人資料</span>
         </DropdownMenuItem>

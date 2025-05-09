@@ -26,7 +26,7 @@ import { zhTW } from "date-fns/locale"
 import { toast } from "sonner"
 import { useState, useEffect } from "react"
 import { useProfile } from "@/hooks/useProfile"
-import type { PostWithProfile } from "./PostCard"
+import type { PostWithProfile } from "@/lib/types/database.types"
 
 interface PostHeaderProps {
   post: PostWithProfile

@@ -80,7 +80,7 @@ export function PostActions({
 
   // 處理按讚
   const handleLike = async () => {
-    if (!checkPermission('user')) {
+    if (!user || !checkPermission('write:posts')) {
       toast({
         variant: "destructive",
         title: "無法執行操作",
@@ -167,7 +167,7 @@ export function PostActions({
 
   // 發表評論
   const handleComment = async () => {
-    if (!checkPermission('user')) {
+    if (!user || !checkPermission('write:posts')) {
       toast({
         variant: "destructive",
         title: "無法執行操作",
@@ -220,12 +220,20 @@ export function PostActions({
 
   // 刪除評論
   const handleDeleteComment = async (commentId: string) => {
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "無法執行操作",
+        description: "您需要登入才能刪除評論",
+      })
+      return
+    }
     try {
       const { error } = await supabase
         .from("comments")
         .delete()
         .eq("id", commentId)
-        .eq("user_id", user?.id)
+        .eq("user_id", user.id)
 
       if (error) throw error
 
@@ -249,12 +257,20 @@ export function PostActions({
 
   // 刪除貼文
   const handleDeletePost = async () => {
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "無法執行操作",
+        description: "您需要登入才能刪除貼文",
+      })
+      return
+    }
     try {
       const { error } = await supabase
         .from("posts")
         .delete()
         .eq("id", postId)
-        .eq("user_id", user?.id)
+        .eq("user_id", user.id)
 
       if (error) throw error
 
@@ -277,11 +293,19 @@ export function PostActions({
 
   // 分享貼文
   const handleShare = async () => {
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "無法執行操作",
+        description: "您需要登入才能分享貼文",
+      })
+      return
+    }
     try {
       // 創建分享記錄
       const { error } = await supabase
         .from("shares")
-        .insert({ post_id: postId, user_id: user?.id })
+        .insert({ post_id: postId, user_id: user.id })
 
       if (error) throw error
 

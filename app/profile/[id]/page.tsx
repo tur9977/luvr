@@ -171,6 +171,11 @@ export default async function ProfilePage({ params }: Props) {
     }
   }) || []
 
+  // Debug log for profile page data
+  console.log('[ProfilePage] profile:', profile)
+  console.log('[ProfilePage] formattedPosts:', formattedPosts)
+  console.log('[ProfilePage] formattedLikedPosts:', formattedLikedPosts)
+
   return (
     <main className="container max-w-2xl mx-auto p-4">
       <div className="flex flex-col items-center gap-6 py-8">
