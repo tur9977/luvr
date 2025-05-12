@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "backup": "node scripts/backup.js",
+    "deploy": "node scripts/deploy.js"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",
@@ -48,10 +50,12 @@
     "cmdk": "^0.2.0",
     "critters": "^0.0.23",
     "date-fns": "^2.30.0",
+    "dotenv": "^16.5.0",
     "embla-carousel-react": "^8.0.0",
     "input-otp": "^1.0.1",
     "lucide-react": "^0.294.0",
     "next": "14.0.4",
+    "next-auth": "^5.0.0-beta.28",
     "next-themes": "^0.2.1",
     "react": "^18.2.0",
     "react-day-picker": "^8.9.1",
@@ -67,6 +71,7 @@
     "tailwind-merge": "^2.1.0",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.8.0",
+    "winston": "^3.17.0",
     "zod": "^3.22.4",
     "zustand": "^5.0.3"
   },

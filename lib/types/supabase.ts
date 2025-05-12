@@ -7,6 +7,8 @@ export type Json =
   | Json[];
 
 export type ProfileRole = 'normal_user' | 'banned_user' | 'verified_user' | 'brand_user' | 'admin';
+export type EventStatus = 'active' | 'ended' | 'cancelled';
+export type EventCategory = 'party' | 'meetup' | 'online' | 'other';
 
 export interface Profile {
   id: string;
@@ -23,8 +25,22 @@ export interface Profile {
 export interface Post {
   id: string;
   user_id: string;
+  event_id: string | null;
   caption: string | null;
   location: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Event {
+  id: string;
+  creator_id: string;
+  title: string;
+  description: string | null;
+  date: string;
+  location: string | null;
+  status: EventStatus;
+  category: EventCategory;
   created_at: string;
   updated_at: string;
 }
@@ -55,6 +71,11 @@ export interface Database {
         Insert: Omit<Post, 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Omit<Post, 'id'>>;
       };
+      events: {
+        Row: Event;
+        Insert: Omit<Event, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<Event, 'id'>>;
+      };
       reports: {
         Row: Report;
         Insert: Omit<Report, 'id' | 'created_at' | 'resolved_at'>;
@@ -84,6 +105,10 @@ export interface Database {
         Args: { user_id: string };
         Returns: ProfileRole;
       };
+    };
+    Enums: {
+      event_status: EventStatus;
+      event_category: EventCategory;
     };
   };
 }

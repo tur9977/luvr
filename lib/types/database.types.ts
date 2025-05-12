@@ -1,3 +1,82 @@
+import type { Database as SupabaseDatabase } from './supabase'
+
+export type Tables = SupabaseDatabase['public']['Tables']
+export type Enums = SupabaseDatabase['public']['Enums']
+
+export type Post = Tables['posts']['Row']
+export type NewPost = Tables['posts']['Insert']
+export type UpdatePost = Tables['posts']['Update']
+
+export type Event = Tables['events']['Row']
+export type NewEvent = Tables['events']['Insert']
+export type UpdateEvent = Tables['events']['Update']
+
+export type PostMedia = {
+  id: string
+  post_id: string
+  media_url: string
+  media_type: 'image' | 'video'
+  aspect_ratio: number
+  created_at: string
+}
+
+export type PostWithProfile = Post & {
+  profiles: {
+    id: string
+    username: string | null
+    avatar_url: string | null
+  } | null
+  post_media: PostMedia[]
+  likes_count: number
+  comments_count: number
+  shares_count: number
+}
+
+export type EventWithProfile = Event & {
+  profiles: {
+    id: string
+    username: string | null
+    avatar_url: string | null
+  } | null
+  participants_count: number
+}
+
+export type ProfileRole = SupabaseDatabase['public']['Tables']['profiles']['Row']['role']
+export type EventStatus = SupabaseDatabase['public']['Enums']['event_status']
+export type EventCategory = SupabaseDatabase['public']['Enums']['event_category']
+
+export type Profile = SupabaseDatabase['public']['Tables']['profiles']['Row']
+
+export type PostLike = {
+  id: string
+  post_id: string
+  user_id: string
+  created_at: string
+}
+
+export type PostComment = {
+  id: string
+  post_id: string
+  user_id: string
+  content: string
+  created_at: string
+  profiles?: Profile
+}
+
+export type Like = {
+  id: string
+  post_id: string
+  user_id: string
+  created_at: string
+}
+
+export type Share = {
+  id: string
+  post_id: string
+  user_id: string
+  created_at: string
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -5,6 +84,7 @@ export interface Database {
         Row: {
           id: string
           user_id: string
+          event_id: string | null
           media_urls: string[]
           media_url?: string
           media_type: "image" | "video"
@@ -19,6 +99,7 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
+          event_id?: string | null
           media_urls: string[]
           media_url?: string
           media_type: "image" | "video"
@@ -33,6 +114,7 @@ export interface Database {
         Update: {
           id?: string
           user_id?: string
+          event_id?: string | null
           media_urls?: string[]
           media_url?: string
           media_type?: "image" | "video"
@@ -239,79 +321,4 @@ export interface Database {
       [_ in never]: never
     }
   }
-}
-
-export type ProfileRole = 'user' | 'admin' | 'banned'
-
-export interface Profile {
-  id: string
-  username: string | null
-  avatar_url: string | null
-  role: ProfileRole
-  created_at: string | null
-}
-
-export interface PostMedia {
-  id: string
-  media_url: string
-  media_type: "image" | "video"
-  aspect_ratio: number
-  duration?: number | null
-  order: number
-}
-
-export interface PostLike {
-  id: string
-  post_id: string
-  user_id: string
-  created_at: string
-}
-
-export interface PostComment {
-  id: string
-  post_id: string
-  user_id: string
-  content: string
-  created_at: string
-  profiles?: Profile
-}
-
-export interface Post {
-  id: string
-  user_id: string
-  content: string
-  media_urls: string[]
-  created_at: string
-  profiles?: Profile
-  likes_count: number
-  comments_count: number
-  shares_count: number
-  is_liked?: boolean
-  location?: string | null
-}
-
-export interface PostWithProfile extends Post {
-  profiles: Profile
-  post_media?: PostMedia[]
-  _count?: {
-    likes: number
-    comments: number
-    shares: number
-  }
-  has_liked?: boolean
-  comments?: PostComment[]
-}
-
-export interface Like {
-  id: string
-  post_id: string
-  user_id: string
-  created_at: string
-}
-
-export interface Share {
-  id: string
-  post_id: string
-  user_id: string
-  created_at: string
 }
