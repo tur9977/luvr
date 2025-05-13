@@ -8,170 +8,120 @@ const supabase = createClient(
 
 async function migrate() {
   try {
-    // 1. 創建 posts 表（如果不存在）
-    const { error: createPostsError } = await supabase.rpc('create_posts_table', {
+    // 創建 posts 表
+    const { error: postsError } = await supabase.rpc('exec_sql', {
       sql: `
-        CREATE TABLE IF NOT EXISTS posts (
+        CREATE TABLE IF NOT EXISTS public.posts (
           id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-          user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-          event_id UUID REFERENCES events(id) ON DELETE SET NULL,
-          media_urls TEXT[] DEFAULT '{}',
-          media_type TEXT CHECK (media_type IN ('image', 'video')),
-          thumbnail_url TEXT,
-          aspect_ratio NUMERIC DEFAULT 1,
-          duration INTEGER,
-          caption TEXT,
-          location TEXT,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+          content TEXT,
+          event_id UUID REFERENCES public.events(id) ON DELETE SET NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
         );
 
         -- 創建 RLS 策略
-        ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
 
         CREATE POLICY "Users can view all posts"
-          ON posts FOR SELECT
+          ON public.posts FOR SELECT
           USING (true);
 
         CREATE POLICY "Users can create their own posts"
-          ON posts FOR INSERT
+          ON public.posts FOR INSERT
           WITH CHECK (auth.uid() = user_id);
 
         CREATE POLICY "Users can update their own posts"
-          ON posts FOR UPDATE
+          ON public.posts FOR UPDATE
           USING (auth.uid() = user_id);
 
         CREATE POLICY "Users can delete their own posts"
-          ON posts FOR DELETE
+          ON public.posts FOR DELETE
           USING (auth.uid() = user_id);
       `
     })
 
-    if (createPostsError) throw createPostsError
+    if (postsError) throw postsError
 
-    // 2. 創建 events 表（如果不存在）
-    const { error: createEventsError } = await supabase.rpc('create_events_table', {
+    // 創建 events 表
+    const { error: eventsError } = await supabase.rpc('exec_sql', {
       sql: `
-        CREATE TABLE IF NOT EXISTS events (
+        CREATE TABLE IF NOT EXISTS public.events (
           id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-          creator_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+          creator_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
           title TEXT NOT NULL,
           description TEXT,
           date TIMESTAMP WITH TIME ZONE NOT NULL,
           location TEXT,
-          status TEXT CHECK (status IN ('draft', 'upcoming', 'ongoing', 'completed', 'cancelled')) DEFAULT 'draft',
-          event_type TEXT,
-          max_participants INTEGER,
-          registration_deadline TIMESTAMP WITH TIME ZONE,
-          price NUMERIC,
-          currency TEXT,
-          tags TEXT[],
-          metadata JSONB,
-          cover_url TEXT,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'ended', 'cancelled')),
+          category TEXT NOT NULL DEFAULT 'other' CHECK (category IN ('party', 'meetup', 'online', 'other')),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
         );
 
         -- 創建 RLS 策略
-        ALTER TABLE events ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 
         CREATE POLICY "Users can view all events"
-          ON events FOR SELECT
+          ON public.events FOR SELECT
           USING (true);
 
         CREATE POLICY "Users can create events"
-          ON events FOR INSERT
+          ON public.events FOR INSERT
           WITH CHECK (auth.uid() = creator_id);
 
         CREATE POLICY "Users can update their own events"
-          ON events FOR UPDATE
+          ON public.events FOR UPDATE
           USING (auth.uid() = creator_id);
 
         CREATE POLICY "Users can delete their own events"
-          ON events FOR DELETE
+          ON public.events FOR DELETE
           USING (auth.uid() = creator_id);
       `
     })
 
-    if (createEventsError) throw createEventsError
+    if (eventsError) throw eventsError
 
-    // 3. 創建 event_participants 表
-    const { error: createParticipantsError } = await supabase.rpc('create_event_participants_table', {
+    // 創建 event_participants 表
+    const { error: participantsError } = await supabase.rpc('exec_sql', {
       sql: `
-        CREATE TABLE IF NOT EXISTS event_participants (
-          event_id UUID REFERENCES events(id) ON DELETE CASCADE,
-          user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-          status TEXT CHECK (status IN ('going', 'interested', 'not_going')) DEFAULT 'going',
-          payment_status TEXT CHECK (payment_status IN ('pending', 'paid', 'refunded', 'cancelled')),
-          payment_details JSONB,
-          check_in_time TIMESTAMP WITH TIME ZONE,
-          notes TEXT,
-          metadata JSONB,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          PRIMARY KEY (event_id, user_id)
+        CREATE TABLE IF NOT EXISTS public.event_participants (
+          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+          event_id UUID NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
+          user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+          status TEXT NOT NULL DEFAULT 'going' CHECK (status IN ('going', 'interested', 'not_going')),
+          payment_status TEXT NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'refunded')),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+          UNIQUE(event_id, user_id)
         );
 
         -- 創建 RLS 策略
-        ALTER TABLE event_participants ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE public.event_participants ENABLE ROW LEVEL SECURITY;
 
         CREATE POLICY "Users can view all participants"
-          ON event_participants FOR SELECT
+          ON public.event_participants FOR SELECT
           USING (true);
 
         CREATE POLICY "Users can manage their own participation"
-          ON event_participants FOR ALL
+          ON public.event_participants FOR ALL
           USING (auth.uid() = user_id);
+
+        CREATE POLICY "Event creators can manage participants"
+          ON public.event_participants FOR ALL
+          USING (
+            EXISTS (
+              SELECT 1 FROM public.events
+              WHERE id = event_participants.event_id
+              AND creator_id = auth.uid()
+            )
+          );
       `
     })
 
-    if (createParticipantsError) throw createParticipantsError
+    if (participantsError) throw participantsError
 
-    // 4. 創建索引
-    const { error: createIndexesError } = await supabase.rpc('create_indexes', {
-      sql: `
-        CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
-        CREATE INDEX IF NOT EXISTS idx_posts_event_id ON posts(event_id);
-        CREATE INDEX IF NOT EXISTS idx_events_creator_id ON events(creator_id);
-        CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
-        CREATE INDEX IF NOT EXISTS idx_events_date ON events(date);
-        CREATE INDEX IF NOT EXISTS idx_event_participants_status ON event_participants(status);
-        CREATE INDEX IF NOT EXISTS idx_event_participants_payment_status ON event_participants(payment_status);
-      `
-    })
-
-    if (createIndexesError) throw createIndexesError
-
-    // 5. 創建觸發器
-    const { error: createTriggersError } = await supabase.rpc('create_triggers', {
-      sql: `
-        -- 更新 updated_at 的觸發器函數
-        CREATE OR REPLACE FUNCTION update_updated_at_column()
-        RETURNS TRIGGER AS $$
-        BEGIN
-          NEW.updated_at = NOW();
-          RETURN NEW;
-        END;
-        $$ language 'plpgsql';
-
-        -- 為 posts 表添加觸發器
-        DROP TRIGGER IF EXISTS update_posts_updated_at ON posts;
-        CREATE TRIGGER update_posts_updated_at
-          BEFORE UPDATE ON posts
-          FOR EACH ROW
-          EXECUTE FUNCTION update_updated_at_column();
-
-        -- 為 events 表添加觸發器
-        DROP TRIGGER IF EXISTS update_events_updated_at ON events;
-        CREATE TRIGGER update_events_updated_at
-          BEFORE UPDATE ON events
-          FOR EACH ROW
-          EXECUTE FUNCTION update_updated_at_column();
-      `
-    })
-
-    if (createTriggersError) throw createTriggersError
-
-    console.log('Migration completed successfully!')
+    console.log('Migration completed successfully')
   } catch (error) {
     console.error('Migration failed:', error)
     process.exit(1)
