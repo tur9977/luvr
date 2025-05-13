@@ -18,6 +18,12 @@ const logger = winston.createLogger({
     new winston.transports.File({ 
       filename: path.join(process.cwd(), 'logs', 'error.log'), 
       level: 'error' 
+    }),
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
     })
   ]
 })
@@ -51,4 +57,6 @@ export const logTransaction = (action: string, data: any) => {
     data,
     timestamp: new Date().toISOString()
   })
-} 
+}
+
+export { logger } 
