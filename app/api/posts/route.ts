@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { createPost, getPostsByEventId } from '@/lib/supabase/services/postService'
+import { errorHandler } from '@/lib/middleware/error'
 import type { NewPost } from '@/lib/types/database.types'
 
 export async function GET(request: Request) {
@@ -15,8 +16,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ error: 'Missing eventId parameter' }, { status: 400 })
   } catch (error) {
-    console.error('Error fetching posts:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    return errorHandler(error as Error, request, new Response())
   }
 }
 
@@ -33,7 +33,6 @@ export async function POST(request: Request) {
     const newPost = await createPost(post)
     return NextResponse.json(newPost)
   } catch (error) {
-    console.error('Error creating post:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    return errorHandler(error as Error, request, new Response())
   }
 } 

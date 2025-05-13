@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { createEvent, getEventsByStatus } from '@/lib/supabase/services/eventService'
+import { errorHandler } from '@/lib/middleware/error'
 import type { NewEvent } from '@/lib/types/database.types'
 
 export async function GET(request: Request) {
@@ -11,8 +12,7 @@ export async function GET(request: Request) {
     const events = await getEventsByStatus(status)
     return NextResponse.json(events)
   } catch (error) {
-    console.error('Error fetching events:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    return errorHandler(error as Error, request, new Response())
   }
 }
 
@@ -29,7 +29,6 @@ export async function POST(request: Request) {
     const newEvent = await createEvent(event)
     return NextResponse.json(newEvent)
   } catch (error) {
-    console.error('Error creating event:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    return errorHandler(error as Error, request, new Response())
   }
 } 
