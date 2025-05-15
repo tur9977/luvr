@@ -1,6 +1,154 @@
 import { supabase } from '../client'
-import { Event, NewEvent, UpdateEvent, EventParticipant, NewEventParticipant } from '@/lib/types/database.types'
+import { Event, Post, NewEvent, NewPost, UpdateEvent, EventParticipant, NewEventParticipant } from '@/lib/types/database.types'
 import { logger } from './logger'
+
+interface CreateEventWithPostParams {
+  event: NewEvent;
+  post: NewPost;
+}
+
+interface CreateEventWithPostResult {
+  event: Event;
+  post: Post;
+}
+
+export async function createEventWithPost(
+  userId: string,
+  params: CreateEventWithPostParams
+): Promise<CreateEventWithPostResult> {
+  try {
+    logger.info('Creating event with post', { userId, params })
+
+    const { data, error } = await supabase.rpc('create_event_with_post', {
+      p_user_id: userId,
+      p_event: params.event,
+      p_post: params.post,
+    })
+
+    if (error) {
+      logger.error('Error creating event with post', { error })
+      throw error
+    }
+
+    logger.info('Successfully created event with post', { data })
+    return data
+  } catch (error) {
+    logger.error('Error in createEventWithPost', { error })
+    throw error
+  }
+}
+
+export async function getEventById(id: string): Promise<Event | null> {
+  try {
+    logger.info('Getting event by id', { id })
+
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error) {
+      logger.error('Error getting event by id', { error })
+      throw error
+    }
+
+    logger.info('Successfully got event by id', { data })
+    return data
+  } catch (error) {
+    logger.error('Error in getEventById', { error })
+    throw error
+  }
+}
+
+export async function updateEvent(
+  id: string,
+  updates: Partial<Event>,
+  userId: string
+): Promise<Event> {
+  try {
+    logger.info('Updating event', { id, updates, userId })
+
+    // 先獲取事件以檢查權限
+    const { data: event, error: getError } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (getError) {
+      logger.error('Error getting event for update', { getError })
+      throw getError
+    }
+
+    if (!event) {
+      throw new Error('Event not found')
+    }
+
+    if (event.creator_id !== userId) {
+      throw new Error('Unauthorized')
+    }
+
+    const { data, error } = await supabase
+      .from('events')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      logger.error('Error updating event', { error })
+      throw error
+    }
+
+    logger.info('Successfully updated event', { data })
+    return data
+  } catch (error) {
+    logger.error('Error in updateEvent', { error })
+    throw error
+  }
+}
+
+export async function deleteEvent(id: string, userId: string): Promise<void> {
+  try {
+    logger.info('Deleting event', { id, userId })
+
+    // 先獲取事件以檢查權限
+    const { data: event, error: getError } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (getError) {
+      logger.error('Error getting event for delete', { getError })
+      throw getError
+    }
+
+    if (!event) {
+      throw new Error('Event not found')
+    }
+
+    if (event.creator_id !== userId) {
+      throw new Error('Unauthorized')
+    }
+
+    const { error } = await supabase
+      .from('events')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      logger.error('Error deleting event', { error })
+      throw error
+    }
+
+    logger.info('Successfully deleted event', { id })
+  } catch (error) {
+    logger.error('Error in deleteEvent', { error })
+    throw error
+  }
+}
 
 export class EventService {
   private static instance: EventService
@@ -12,106 +160,6 @@ export class EventService {
       EventService.instance = new EventService()
     }
     return EventService.instance
-  }
-
-  async createEventWithPost(
-    userId: string,
-    eventData: Omit<NewEvent, 'creator_id' | 'participants_count' | 'comments_count' | 'photos_count' | 'created_at' | 'updated_at'>,
-    postContent: string
-  ): Promise<{ event: Event; post: any }> {
-    try {
-      logger.info('Creating event with post', { userId, eventData })
-
-      const { data, error } = await supabase.rpc('create_event_with_post', {
-        p_user_id: userId,
-        p_title: eventData.title,
-        p_description: eventData.description,
-        p_date: eventData.date,
-        p_location: eventData.location,
-        p_status: eventData.status || 'upcoming',
-        p_event_type: eventData.event_type || 'other',
-        p_post_content: postContent
-      })
-
-      if (error) {
-        logger.error('Error creating event with post', { error })
-        throw error
-      }
-
-      logger.info('Successfully created event with post', { data })
-      return data
-    } catch (error) {
-      logger.error('Failed to create event with post', { error })
-      throw error
-    }
-  }
-
-  async getEventById(id: string): Promise<Event | null> {
-    try {
-      logger.info('Fetching event by ID', { id })
-
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .eq('id', id)
-        .single()
-
-      if (error) {
-        logger.error('Error fetching event', { error })
-        throw error
-      }
-
-      logger.info('Successfully fetched event', { data })
-      return data
-    } catch (error) {
-      logger.error('Failed to fetch event', { error })
-      throw error
-    }
-  }
-
-  async updateEvent(id: string, updates: UpdateEvent): Promise<Event> {
-    try {
-      logger.info('Updating event', { id, updates })
-
-      const { data, error } = await supabase
-        .from('events')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single()
-
-      if (error) {
-        logger.error('Error updating event', { error })
-        throw error
-      }
-
-      logger.info('Successfully updated event', { data })
-      return data
-    } catch (error) {
-      logger.error('Failed to update event', { error })
-      throw error
-    }
-  }
-
-  async deleteEvent(id: string): Promise<void> {
-    try {
-      logger.info('Deleting event', { id })
-
-      const { error } = await supabase
-        .from('events')
-        .delete()
-        .eq('id', id)
-
-      if (error) {
-        logger.error('Error deleting event', { error })
-        throw error
-      }
-
-      logger.info('Successfully deleted event', { id })
-    } catch (error) {
-      logger.error('Failed to delete event', { error })
-      throw error
-    }
   }
 
   async joinEvent(eventId: string, userId: string, status: 'going' | 'interested' | 'not_going' = 'going'): Promise<EventParticipant> {
