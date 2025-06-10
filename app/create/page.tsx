@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState, useEffect } from "react"
+import { useCallback, useState, useEffect, Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -45,7 +45,7 @@ function isVideoType(type: MediaType): type is "video" {
   return type === "video"
 }
 
-export default function CreatePage() {
+function CreatePageContent() {
   const { toast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -952,5 +952,13 @@ const getVideoDuration = (file: File): Promise<number> => {
     }
     video.src = URL.createObjectURL(file)
   })
+}
+
+export default function CreatePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CreatePageContent />
+    </Suspense>
+  )
 }
 

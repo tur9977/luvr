@@ -251,4 +251,49 @@ export class EventService {
       throw error
     }
   }
+}
+
+export async function getEventsByStatus(status: string): Promise<Event[]> {
+  try {
+    logger.info('Getting events by status', { status })
+
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('status', status)
+
+    if (error) {
+      logger.error('Error getting events by status', { error })
+      throw error
+    }
+
+    logger.info('Successfully got events by status', { data })
+    return data || []
+  } catch (error) {
+    logger.error('Error in getEventsByStatus', { error })
+    throw error
+  }
+}
+
+export async function createEvent(event: NewEvent): Promise<Event> {
+  try {
+    logger.info('Creating event', { event })
+
+    const { data, error } = await supabase
+      .from('events')
+      .insert(event)
+      .select()
+      .single()
+
+    if (error) {
+      logger.error('Error creating event', { error })
+      throw error
+    }
+
+    logger.info('Successfully created event', { data })
+    return data
+  } catch (error) {
+    logger.error('Error in createEvent', { error })
+    throw error
+  }
 } 
