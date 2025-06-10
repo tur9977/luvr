@@ -1,32 +1,45 @@
+// 取代原本的 supabase mock
+jest.mock('../../lib/supabase/client', () => {
+  const mockSelect = jest.fn().mockReturnThis();
+  const mockEq = jest.fn().mockReturnThis();
+  const mockSingle = jest.fn();
+  const mockUpdate = jest.fn().mockReturnThis();
+  const mockDelete = jest.fn().mockReturnThis();
+  const mockInsert = jest.fn().mockReturnThis();
+
+  // 每次 from() 都回傳一個新的 chainable
+  function createChainable() {
+    return {
+      select: mockSelect,
+      eq: mockEq,
+      single: mockSingle,
+      update: mockUpdate,
+      delete: mockDelete,
+      insert: mockInsert,
+    };
+  }
+
+  return {
+    supabase: {
+      rpc: jest.fn(),
+      from: jest.fn(() => createChainable()),
+    },
+    __mockSelect: mockSelect,
+    __mockSingle: mockSingle,
+    __mockEq: mockEq,
+    __mockUpdate: mockUpdate,
+    __mockDelete: mockDelete,
+    __mockInsert: mockInsert,
+  };
+});
+
 import { supabase } from '../../lib/supabase/client';
 import { testUser, testEvent, testPost, cleanupTestData } from '../setup';
-import { createEventWithPost, getEventById, updateEvent, deleteEvent } from '../../lib/supabase/services/eventService';
+import { createEventWithPost, getEventById, updateEvent, deleteEvent, EventService } from '../../lib/supabase/services/eventService';
 import { Event, Post } from '../../lib/types/database.types';
 import { logger } from '../../lib/supabase/services/logger';
 
-// 模擬 Supabase 客戶端
-jest.mock('../../lib/supabase/client', () => ({
-  supabase: {
-    rpc: jest.fn(),
-    from: jest.fn(() => ({
-      select: jest.fn(() => ({
-        eq: jest.fn(() => ({
-          single: jest.fn()
-        }))
-      })),
-      update: jest.fn(() => ({
-        eq: jest.fn(() => ({
-          select: jest.fn(() => ({
-            single: jest.fn()
-          }))
-        }))
-      })),
-      delete: jest.fn(() => ({
-        eq: jest.fn()
-      }))
-    }))
-  }
-}));
+const { __mockSingle, __mockInsert } = require('../../lib/supabase/client');
 
 // 模擬 logger
 jest.mock('../../lib/supabase/services/logger', () => ({
@@ -73,8 +86,13 @@ describe('Event Service', () => {
     updated_at: new Date().toISOString()
   };
 
+  let eventService: EventService;
+
   beforeEach(() => {
+    eventService = EventService.getInstance();
     jest.clearAllMocks();
+    __mockSingle.mockReset();
+    __mockInsert.mockReset();
   });
 
   describe('createEventWithPost', () => {
@@ -276,6 +294,38 @@ describe('Event Service', () => {
         .rejects.toMatchObject({ message: 'Invalid input' });
       expect(logger.error).toHaveBeenCalled();
     });
+
+    it('should handle event not found', async () => {
+      const mockFrom = supabase.from as jest.Mock;
+      const mockSelect = jest.fn(() => ({
+        eq: jest.fn(() => ({
+          single: jest.fn().mockResolvedValueOnce({
+            data: null,
+            error: null
+          })
+        }))
+      }));
+      mockFrom.mockReturnValue({ select: mockSelect });
+
+      await expect(updateEvent('non-existent', { title: 'New Title' }, testUser.id))
+        .rejects.toThrow('Event not found');
+    });
+
+    it('should handle database error when getting event', async () => {
+      const mockFrom = supabase.from as jest.Mock;
+      const mockSelect = jest.fn(() => ({
+        eq: jest.fn(() => ({
+          single: jest.fn().mockResolvedValueOnce({
+            data: null,
+            error: { message: 'Database error' }
+          })
+        }))
+      }));
+      mockFrom.mockReturnValue({ select: mockSelect });
+
+      await expect(updateEvent('event1', { title: 'New Title' }, testUser.id))
+        .rejects.toMatchObject({ message: 'Database error' });
+    });
   });
 
   describe('deleteEvent', () => {
@@ -339,6 +389,78 @@ describe('Event Service', () => {
       await expect(deleteEvent(mockEvent.id, testUser.id))
         .rejects.toMatchObject({ message: 'Foreign key violation' });
       expect(logger.error).toHaveBeenCalled();
+    });
+
+    it('should handle event not found', async () => {
+      const mockFrom = supabase.from as jest.Mock;
+      const mockSelect = jest.fn(() => ({
+        eq: jest.fn(() => ({
+          single: jest.fn().mockResolvedValueOnce({
+            data: null,
+            error: null
+          })
+        }))
+      }));
+      mockFrom.mockReturnValue({ select: mockSelect });
+
+      await expect(deleteEvent('non-existent', testUser.id))
+        .rejects.toThrow('Event not found');
+    });
+
+    it('should handle database error when getting event', async () => {
+      const mockFrom = supabase.from as jest.Mock;
+      const mockSelect = jest.fn(() => ({
+        eq: jest.fn(() => ({
+          single: jest.fn().mockResolvedValueOnce({
+            data: null,
+            error: { message: 'Database error' }
+          })
+        }))
+      }));
+      mockFrom.mockReturnValue({ select: mockSelect });
+
+      await expect(deleteEvent('event1', testUser.id))
+        .rejects.toMatchObject({ message: 'Database error' });
+    });
+  });
+
+  describe('joinEvent', () => {
+    it('should check registration_deadline before joining event', async () => {
+      const mockEvent = {
+        id: 'event1',
+        participants: [],
+        registration_deadline: '2023-01-01T00:00:00Z'
+      };
+      __mockSingle.mockResolvedValueOnce({ data: mockEvent, error: null });
+      await expect(eventService.joinEvent('event1', 'user1'))
+        .rejects.toThrow('Registration closed');
+    });
+
+    it('should join event when registration is open', async () => {
+      const mockEvent = {
+        id: 'event1',
+        participants: [],
+        registration_deadline: '2025-12-31T23:59:59Z'
+      };
+      __mockSingle.mockResolvedValueOnce({ data: mockEvent, error: null });
+      __mockInsert.mockResolvedValueOnce({
+        data: { id: 'participant1', event_id: 'event1', user_id: 'user1' },
+        error: null
+      });
+      const result = await eventService.joinEvent('event1', 'user1');
+      expect(result).toBeDefined();
+    });
+
+    it('should handle event not found', async () => {
+      __mockSingle.mockResolvedValueOnce({ data: null, error: null });
+      await expect(eventService.joinEvent('non-existent', 'user1'))
+        .rejects.toThrow('Event not found');
+    });
+
+    it('should handle database error', async () => {
+      __mockSingle.mockResolvedValueOnce({ data: null, error: { message: 'Database error' } });
+      await expect(eventService.joinEvent('event1', 'user1'))
+        .rejects.toMatchObject({ message: 'Database error' });
     });
   });
 }); 

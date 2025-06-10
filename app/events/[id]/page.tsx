@@ -144,7 +144,7 @@ export default function EventPage() {
         .from("events")
         .select(`
           *,
-          profiles:user_id (
+          profiles:creator_id (
             username,
             avatar_url
           )
